@@ -108,7 +108,8 @@ static struct {
 static int arcade_table_count = 0;
 
 static const char* arcadeName(const char* rom_path) {
-	if (!prefixMatch(ROMS_PATH "/", (char*)rom_path))
+	// ROMS_PATH is a runtime value on desktop, so no literal "/" concatenation
+	if (!prefixMatch(ROMS_PATH, rom_path) || rom_path[strlen(ROMS_PATH)] != '/')
 		return NULL;
 	char tag[MAX_PATH];
 	getEmuName(rom_path, tag);
