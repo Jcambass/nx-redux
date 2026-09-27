@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ui_listview.h"
+#include "initial_jump.h"
 #include "api.h"
 #include "defines.h"
 #include "ui_buttonhintbar.h"
@@ -156,48 +157,19 @@ ListViewAction UI_listViewHandleInput(ListView* v) {
 
 // First letter of row i's label, uppercased ('a'-'z' -> 'A'-'Z'); leading
 // spaces skipped. Used only by the initial-jump navigation below.
-static char row_initial(ListView* v, int i) {
+static char row_initial(void* ctx, int i) {
 	ListViewRow row;
-	get_row_safe(v, i, false, &row);
-	const char* s = row.label;
-	while (*s == ' ')
-		s++;
-	char c = *s;
-	if (c >= 'a' && c <= 'z')
-		c = (char)(c - 'a' + 'A');
-	return c;
+	get_row_safe((ListView*)ctx, i, false, &row);
+	return InitialJump_labelInitial(row.label);
 }
 
 bool UI_listViewJumpInitial(ListView* v, int dir) {
 	if (!v || v->count <= 1)
 		return false;
 	int n = v->count;
-	int sel = v->selected;
-	if (sel < 0)
-		sel = 0;
-	if (sel >= n)
-		sel = n - 1;
-	char cur = row_initial(v, sel);
-	int target;
-	if (dir > 0) {
-		int i = sel + 1;
-		while (i < n && row_initial(v, i) == cur)
-			i++;
-		if (i >= n)
-			return false; // already in the last letter group
-		target = i;		  // first row of the next group
-	} else {
-		int i = sel - 1;
-		while (i >= 0 && row_initial(v, i) == cur)
-			i--;
-		if (i < 0)
-			return false; // already in the first letter group
-		// i is the last row of the previous group; walk back to its start.
-		char prev = row_initial(v, i);
-		while (i > 0 && row_initial(v, i - 1) == prev)
-			i--;
-		target = i;
-	}
+	int target = InitialJump_target(n, v->selected, dir, row_initial, v);
+	if (target < 0)
+		return false; // already in the first/last letter group
 	if (row_is_header(v, target))
 		target = nearest_selectable(v, target, dir > 0 ? +1 : -1);
 	if (target < 0 || target >= n || target == v->selected)

@@ -30,12 +30,35 @@ static void rtrim(char* s) {
 		s[--len] = '\0';
 }
 
-// Display name = text after the last comma on the #EXTINF line.
+// Display name = text after the last comma on the #EXTINF line, with the
+// surrounding whitespace dropped (a leading space would otherwise sort the
+// channel to the top of the list as its own first-letter group).
 static void extinf_name(const char* line, char* out, int out_sz) {
 	const char* comma = strrchr(line, ',');
 	const char* name = comma ? comma + 1 : line;
+	while (*name == ' ' || *name == '\t')
+		name++;
 	snprintf(out, out_sz, "%s", name);
 	rtrim(out);
+}
+
+// fgets that also swallows the rest of an over-long line, so a line longer
+// than the buffer is consumed as ONE (truncated) line. Without this the tail
+// of a huge #EXTINF attribute list came back as a separate line and, not
+// starting with '#', was taken as the channel URL. Both parser passes use it
+// so their line counts agree.
+static char* read_line(char* buf, int sz, FILE* f) {
+	if (!fgets(buf, sz, f))
+		return NULL;
+	size_t len = strlen(buf);
+	if (len > 0 && buf[len - 1] == '\n')
+		return buf; // complete line
+	if (len < (size_t)(sz - 1))
+		return buf; // short final line without a newline (EOF)
+	int c;
+	while ((c = fgetc(f)) != EOF && c != '\n') {
+	}
+	return buf;
 }
 
 int M3U_parseFile(const char* path, CuratedTVChannel** out, const char* country_code) {
@@ -49,7 +72,7 @@ int M3U_parseFile(const char* path, CuratedTVChannel** out, const char* country_
 	// -- no URL follows -- so the real count can be lower, never higher).
 	char line[2048];
 	int max = 0;
-	while (fgets(line, sizeof(line), f)) {
+	while (read_line(line, sizeof(line), f)) {
 		if (strncmp(line, "#EXTINF", 7) == 0)
 			max++;
 	}
@@ -70,7 +93,7 @@ int M3U_parseFile(const char* path, CuratedTVChannel** out, const char* country_
 	CuratedTVChannel cur;
 	memset(&cur, 0, sizeof(cur));
 
-	while (count < max && fgets(line, sizeof(line), f)) {
+	while (count < max && read_line(line, sizeof(line), f)) {
 		if (strncmp(line, "#EXTINF", 7) == 0) {
 			memset(&cur, 0, sizeof(cur));
 			char buf[512];

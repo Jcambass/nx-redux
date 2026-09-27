@@ -79,6 +79,46 @@ int main(void) {
 		ch = NULL;
 	}
 
+	// Leading whitespace after the name comma is dropped, so " ABC" doesn't
+	// sort to the top as its own first-letter group.
+	write_file(path,
+			   "#EXTINF:-1 group-title=\"News\",  Spaced Name \n"
+			   "http://host/spaced\n");
+	n = M3U_parseFile(path, &ch, NULL);
+	assert(n == 1);
+	assert(strcmp(ch[0].name, "Spaced Name") == 0);
+	free(ch);
+	ch = NULL;
+
+	// An #EXTINF line longer than the parser's line buffer (2048) is consumed
+	// as one line: its tail must not be read back as the channel URL, and the
+	// real URL that follows still pairs with it. Count stays exact.
+	{
+		size_t cap = 8192;
+		char* big = malloc(cap);
+		assert(big);
+		size_t pos = (size_t)snprintf(big, cap, "#EXTINF:-1 tvg-id=\"long.us\" tvg-logo=\"http://x/");
+		while (pos < 5000)
+			big[pos++] = 'a';
+		pos += (size_t)snprintf(big + pos, cap - pos,
+								".png\",Long Attrs\n"
+								"http://host/long\n"
+								"#EXTINF:-1,After\n"
+								"http://host/after\n");
+		assert(pos < cap);
+		write_file(path, big);
+		free(big);
+		n = M3U_parseFile(path, &ch, NULL);
+		assert(n == 2);
+		assert(ch != NULL);
+		assert(strcmp(ch[0].url, "http://host/long") == 0);
+		assert(strncmp(ch[0].url, "aaaa", 4) != 0); // the drained tail is not a URL
+		assert(strcmp(ch[1].name, "After") == 0);
+		assert(strcmp(ch[1].url, "http://host/after") == 0);
+		free(ch);
+		ch = NULL;
+	}
+
 	// No channels at all -> count 0, *out left NULL.
 	write_file(path, "#EXTM3U\n");
 	n = M3U_parseFile(path, &ch, NULL);

@@ -123,12 +123,16 @@ int IPTV_curated_loadCountryChannels(const char* country_code, bool force,
 	if (NetCache_ensure(url, cache, force, should_stop, progress) != 0)
 		return -1;
 
-	free(curated_channels);
-	curated_channels = NULL;
-	curated_channel_count = 0;
-	int n = M3U_parseFile(cache, &curated_channels, country_code);
+	// Parse into a local buffer and swap only on success: a failed parse
+	// (cache file vanished, allocation failure on a big playlist) must leave
+	// the previously loaded list -- which the browser is still showing --
+	// intact rather than emptying it under the user.
+	CuratedTVChannel* parsed = NULL;
+	int n = M3U_parseFile(cache, &parsed, country_code);
 	if (n < 0)
 		return -1;
+	free(curated_channels);
+	curated_channels = parsed;
 	curated_channel_count = n;
 	snprintf(loaded_country_code, sizeof(loaded_country_code), "%s", country_code);
 	return n;

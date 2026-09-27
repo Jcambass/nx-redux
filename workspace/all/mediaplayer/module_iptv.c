@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +14,7 @@
 #include "ui_confirmdialog.h"
 #include "ui_iptv.h"
 #include "ui_icons.h"
+#include "initial_jump.h"
 #include "ui_listview.h"
 #include "ui_loadingoverlay.h"
 #include "ui_toast.h"
@@ -61,6 +61,20 @@ static char confirm_channel_url[IPTV_MAX_URL] = "";
 static int* sorted_channel_indices = NULL;
 static int sorted_channel_count = 0;
 
+// qsort comparator context: the channel array the indices point into. The
+// list is immutable for the duration of the sort, so a file-static base is
+// safe (qsort has no user-data argument).
+static const CuratedTVChannel* sort_channels_base = NULL;
+
+static int compare_channel_index_by_name(const void* a, const void* b) {
+	int ia = *(const int*)a;
+	int ib = *(const int*)b;
+	int r = strcasecmp(sort_channels_base[ia].name, sort_channels_base[ib].name);
+	if (r != 0)
+		return r;
+	return ia - ib; // stable: equal names keep playlist order
+}
+
 static void build_sorted_channel_indices(const char* country_code) {
 	free(sorted_channel_indices);
 	sorted_channel_indices = NULL;
@@ -76,52 +90,43 @@ static void build_sorted_channel_indices(const char* country_code) {
 	sorted_channel_count = sc;
 	for (int i = 0; i < sorted_channel_count; i++)
 		sorted_channel_indices[i] = i;
-	// Insertion sort by name
-	for (int i = 1; i < sorted_channel_count; i++) {
-		int key = sorted_channel_indices[i];
-		int j = i - 1;
-		while (j >= 0 && strcasecmp(cs[sorted_channel_indices[j]].name, cs[key].name) > 0) {
-			sorted_channel_indices[j + 1] = sorted_channel_indices[j];
-			j--;
-		}
-		sorted_channel_indices[j + 1] = key;
-	}
+	// O(n log n): the list is uncapped now (the US playlist alone is ~1,500
+	// entries) and this runs on the UI thread after the loading overlay.
+	sort_channels_base = cs;
+	qsort(sorted_channel_indices, sorted_channel_count, sizeof(int), compare_channel_index_by_name);
+	sort_channels_base = NULL;
+}
+
+// Keep the browse cursor valid after the index array is rebuilt: a refresh
+// can shrink the list (iptv-org drops channels), and a stale selection past
+// the new count would index beyond the exactly-sized allocation.
+static void clamp_channel_selection(void) {
+	if (curated_channel_selected >= sorted_channel_count)
+		curated_channel_selected = sorted_channel_count > 0 ? sorted_channel_count - 1 : 0;
+	if (curated_channel_selected < 0)
+		curated_channel_selected = 0;
+	curated_channel_scroll = 0; // render's UI_adjustListScroll re-derives it from the selection
+}
+
+void IPTVModule_cleanup(void) {
+	free(sorted_channel_indices);
+	sorted_channel_indices = NULL;
+	sorted_channel_count = 0;
 }
 
 // L1/R1: jump the channel-browse selection to the next/previous first-letter
-// group, same convention as UI_listViewJumpInitial (used for the country
-// list) -- this list isn't a ListView, so it needs its own copy of that
-// group-boundary logic against sorted_channel_indices directly.
+// group, same walk as UI_listViewJumpInitial (used for the country list) via
+// the shared initial_jump.h helper -- this list isn't a ListView, so it
+// resolves rows through sorted_channel_indices itself.
+static char channel_initial(void* ctx, int i) {
+	const CuratedTVChannel* channels = ctx;
+	return InitialJump_labelInitial(channels[sorted_channel_indices[i]].name);
+}
+
 static bool jump_channel_initial(const CuratedTVChannel* channels, int dir) {
-	if (sorted_channel_count <= 1)
-		return false;
-	int sel = curated_channel_selected;
-	if (sel < 0)
-		sel = 0;
-	if (sel >= sorted_channel_count)
-		sel = sorted_channel_count - 1;
-	char cur = (char)tolower((unsigned char)channels[sorted_channel_indices[sel]].name[0]);
-	int target;
-	if (dir > 0) {
-		int i = sel + 1;
-		while (i < sorted_channel_count &&
-			   (char)tolower((unsigned char)channels[sorted_channel_indices[i]].name[0]) == cur)
-			i++;
-		if (i >= sorted_channel_count)
-			return false; // already in the last letter group
-		target = i;
-	} else {
-		int i = sel - 1;
-		while (i >= 0 && (char)tolower((unsigned char)channels[sorted_channel_indices[i]].name[0]) == cur)
-			i--;
-		if (i < 0)
-			return false; // already in the first letter group
-		char prev = (char)tolower((unsigned char)channels[sorted_channel_indices[i]].name[0]);
-		while (i > 0 && (char)tolower((unsigned char)channels[sorted_channel_indices[i - 1]].name[0]) == prev)
-			i--;
-		target = i;
-	}
-	if (target == curated_channel_selected || target < 0 || target >= sorted_channel_count)
+	int target = InitialJump_target(sorted_channel_count, curated_channel_selected, dir,
+									channel_initial, (void*)channels);
+	if (target < 0 || target == curated_channel_selected)
 		return false;
 	curated_channel_selected = target;
 	return true;
@@ -335,8 +340,20 @@ ModuleExitReason IPTVModule_run(SDL_Surface* screen) {
 			if (global.should_quit)
 				return MODULE_EXIT_QUIT;
 			if (global.context_id == IPTV_CTX_REFRESH) {
-				browse_load_channels(screen, show_setting, curated_selected_country_code, true);
+				// On failure the previously loaded list stays in place (see
+				// IPTV_curated_loadCountryChannels), so only the toast changes.
+				int n = browse_load_channels(screen, show_setting, curated_selected_country_code, true);
 				build_sorted_channel_indices(curated_selected_country_code);
+				clamp_channel_selection();
+				if (n < 0) {
+					snprintf(curated_toast_message, sizeof(curated_toast_message), "Couldn't refresh - check Wi-Fi");
+					curated_toast_time = SDL_GetTicks();
+				} else if (n == 0) {
+					snprintf(curated_toast_message, sizeof(curated_toast_message), "No channels for this country");
+					curated_toast_time = SDL_GetTicks();
+				} else {
+					curated_toast_message[0] = '\0';
+				}
 				dirty = 1;
 			}
 			if (global.input_consumed) {

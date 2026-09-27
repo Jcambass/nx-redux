@@ -135,6 +135,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	IPTVModule_cleanup();
 	IPTV_curated_cleanup();
 	IPTV_cleanup();
 	ModuleCommon_quit();
