@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-// Format the "Enable SSH" hint text into buf.
+// Format the "Enable SSH / SFTP" hint text into buf.
 //
 // running     - non-zero when sshd is up
 // no_password - non-zero on platforms with no SSH password (tg5050)

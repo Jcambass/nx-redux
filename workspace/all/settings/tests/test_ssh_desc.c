@@ -11,29 +11,29 @@ int main(void) {
 
 	// --- not running (ip/no_password are irrelevant) ---
 	assert(dev_format_ssh_desc(b, sizeof(b), 0, 0, "192.168.1.8") >= 0);
-	assert(strcmp(b, "Start SSH server for remote access.") == 0);
+	assert(strcmp(b, "Start SSH/SFTP server for remote access and file transfer.") == 0);
 	assert(dev_format_ssh_desc(b, sizeof(b), 0, 1, "") >= 0);
-	assert(strcmp(b, "Start SSH server for remote access.") == 0);
+	assert(strcmp(b, "Start SSH/SFTP server for remote access and file transfer.") == 0);
 
 	// --- running, ip non-empty, password (tg5040 Brick / Brick Pro) ---
 	dev_format_ssh_desc(b, sizeof(b), 1, 0, "192.168.1.8");
-	assert(strcmp(b, "SSH active. ssh root@192.168.1.8  Password: tina") == 0);
+	assert(strcmp(b, "SSH/SFTP active. root@192.168.1.8  Password: tina") == 0);
 
 	// --- running, ip non-empty, no password (tg5050 Smart Pro S) ---
 	dev_format_ssh_desc(b, sizeof(b), 1, 1, "192.168.1.8");
-	assert(strcmp(b, "SSH active. ssh root@192.168.1.8  No password") == 0);
+	assert(strcmp(b, "SSH/SFTP active. root@192.168.1.8  No password") == 0);
 
 	// --- running, ip empty, password ---
 	dev_format_ssh_desc(b, sizeof(b), 1, 0, "");
-	assert(strcmp(b, "SSH active. Login: root / tina (no network)") == 0);
+	assert(strcmp(b, "SSH/SFTP active. Login: root / tina (no network)") == 0);
 
 	// --- running, ip empty, no password ---
 	dev_format_ssh_desc(b, sizeof(b), 1, 1, "");
-	assert(strcmp(b, "SSH active. Login: root, no password (no network)") == 0);
+	assert(strcmp(b, "SSH/SFTP active. Login: root, no password (no network)") == 0);
 
 	// NULL ip is treated the same as an empty one (no network)
 	dev_format_ssh_desc(b, sizeof(b), 1, 0, NULL);
-	assert(strcmp(b, "SSH active. Login: root / tina (no network)") == 0);
+	assert(strcmp(b, "SSH/SFTP active. Login: root / tina (no network)") == 0);
 
 	// --- truncation: a tiny buffer must not overflow and must report it ---
 	char tiny[8];

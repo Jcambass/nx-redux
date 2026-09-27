@@ -432,12 +432,12 @@ SettingsPage* developer_page_create(DevicePlatform dev_platform) {
 		dev_get_keep_awake_usb, dev_set_keep_awake_usb, dev_reset_keep_awake_usb);
 
 	items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
-		"Enable SSH", dev_get_ssh_desc(),
+		"Enable SSH / SFTP", dev_get_ssh_desc(),
 		on_off_labels, 2, on_off_values,
 		dev_get_ssh, dev_set_ssh, dev_reset_ssh);
 
 	items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
-		"Start SSH on boot", "Automatically start SSH when device boots.",
+		"Start SSH / SFTP on boot", "Automatically start SSH/SFTP when device boots.",
 		on_off_labels, 2, on_off_values,
 		dev_get_ssh_on_boot, dev_set_ssh_on_boot, dev_reset_ssh_on_boot);
 

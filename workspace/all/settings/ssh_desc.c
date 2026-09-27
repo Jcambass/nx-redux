@@ -1,5 +1,5 @@
 /*
- * ssh_desc.c - Formatter for the Developer page's "Enable SSH" hint.
+ * ssh_desc.c - Formatter for the Developer page's "Enable SSH / SFTP" hint.
  *
  * Kept free of SDL/api.h so it can be unit-tested on the host
  * (see tests/test_ssh_desc.c).
@@ -16,15 +16,15 @@ int dev_format_ssh_desc(char* buf, size_t len, int running, int no_password, con
 	int has_ip = (ip && ip[0] != '\0');
 
 	if (!running)
-		return snprintf(buf, len, "Start SSH server for remote access.");
+		return snprintf(buf, len, "Start SSH/SFTP server for remote access and file transfer.");
 
 	if (has_ip) {
 		if (no_password)
-			return snprintf(buf, len, "SSH active. ssh root@%s  No password", ip);
-		return snprintf(buf, len, "SSH active. ssh root@%s  Password: tina", ip);
+			return snprintf(buf, len, "SSH/SFTP active. root@%s  No password", ip);
+		return snprintf(buf, len, "SSH/SFTP active. root@%s  Password: tina", ip);
 	}
 
 	if (no_password)
-		return snprintf(buf, len, "SSH active. Login: root, no password (no network)");
-	return snprintf(buf, len, "SSH active. Login: root / tina (no network)");
+		return snprintf(buf, len, "SSH/SFTP active. Login: root, no password (no network)");
+	return snprintf(buf, len, "SSH/SFTP active. Login: root / tina (no network)");
 }
