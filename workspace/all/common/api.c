@@ -553,61 +553,11 @@ static bool GFX_timezoneIsApplied(const char* timezone) {
 }
 
 
-SDL_Surface* GFX_init(int mode) {
-	// Platform-specific init
-	// This might affect FIXED_SCALE, so do it first
-	PLAT_initPlatform();
-	GFX_startStartupBoost(mode);
+static void GFX_resetNavGlyphs(void);
 
-	gfx.screen = PLAT_initVideo();
-	gfx.vsync = VSYNC_STRICT;
-	gfx.mode = mode;
-
-	// TODO: all this doesn't really belong here...
-	// tried adding to PWR_init() but that was no good (not sure why)
-
-	CFG_init(GFX_loadSystemFont, GFX_updateColors);
-
-	// Reapply only when the volatile symlink is missing or stale. Persisting an
-	// unchanged timezone on every app launch needlessly commits config and syncs
-	// the hardware clock on the transition path.
-	PLAT_initTimezones();
-	char* timezone = PLAT_getCurrentTimezone();
-	if (timezone) {
-		if (!GFX_timezoneIsApplied(timezone))
-			PLAT_setCurrentTimezone(timezone);
-		free(timezone);
-	}
-
-	PLAT_initLid();
-	LEDS_initLeds();
-
-	RGB_WHITE = SDL_MapRGB(gfx.screen->format, TRIAD_WHITE);
-	RGB_BLACK = SDL_MapRGB(gfx.screen->format, TRIAD_BLACK);
-	RGB_LIGHT_GRAY = SDL_MapRGB(gfx.screen->format, TRIAD_LIGHT_GRAY);
-	RGB_GRAY = SDL_MapRGB(gfx.screen->format, TRIAD_GRAY);
-	RGB_DARK_GRAY = SDL_MapRGB(gfx.screen->format, TRIAD_DARK_GRAY);
-
-	asset_rgbs[ASSET_WHITE_PILL] = RGB_WHITE;
-	asset_rgbs[ASSET_BLACK_PILL] = RGB_BLACK;
-	asset_rgbs[ASSET_DARK_GRAY_PILL] = RGB_DARK_GRAY;
-	asset_rgbs[ASSET_OPTION] = RGB_DARK_GRAY;
-	asset_rgbs[ASSET_BUTTON] = RGB_WHITE;
-	asset_rgbs[ASSET_WHITE_RECT] = RGB_WHITE;
-	asset_rgbs[ASSET_BLACK_RECT] = RGB_BLACK;
-	asset_rgbs[ASSET_DARK_GRAY_RECT] = RGB_DARK_GRAY;
-	asset_rgbs[ASSET_OPTION_RECT] = RGB_DARK_GRAY;
-	asset_rgbs[ASSET_BUTTON_RECT] = RGB_WHITE;
-	asset_rgbs[ASSET_PAGE_BG] = RGB_WHITE;
-	asset_rgbs[ASSET_STATE_BG] = RGB_WHITE;
-	asset_rgbs[ASSET_PAGE] = RGB_BLACK;
-	asset_rgbs[ASSET_BAR] = RGB_WHITE;
-	asset_rgbs[ASSET_BAR_BG] = RGB_WHITE;
-	asset_rgbs[ASSET_BAR_BG_MENU] = RGB_WHITE;
-	asset_rgbs[ASSET_UNDERLINE] = RGB_GRAY;
-	asset_rgbs[ASSET_DOT] = RGB_LIGHT_GRAY;
-	asset_rgbs[ASSET_HOLE] = RGB_BLACK;
-
+// Asset-sheet source rects are in scaled pixels, so they are rebuilt whenever
+// the UI scale changes (GFX_init, GFX_reloadScale).
+static void GFX_initAssetRects(void) {
 	asset_rects[ASSET_WHITE_PILL] = (SDL_Rect){SCALE4(1, 1, 30, 30)};
 	asset_rects[ASSET_BLACK_PILL] = (SDL_Rect){SCALE4(33, 1, 30, 30)};
 	asset_rects[ASSET_DARK_GRAY_PILL] = (SDL_Rect){SCALE4(65, 1, 30, 30)};
@@ -656,6 +606,71 @@ SDL_Surface* GFX_init(int mode) {
 	asset_rects[ASSET_BLUETOOTH_OFF] = (SDL_Rect){SCALE4(66, 104, 12, 12)};
 	asset_rects[ASSET_AUDIO] = (SDL_Rect){SCALE4(79, 104, 12, 12)};
 	asset_rects[ASSET_CONTROLLER] = (SDL_Rect){SCALE4(92, 104, 12, 12)};
+}
+
+SDL_Surface* GFX_init(int mode) {
+	// Platform-specific init
+	// This might affect FIXED_SCALE, so do it first
+	PLAT_initPlatform();
+	GFX_startStartupBoost(mode);
+
+	gfx.screen = PLAT_initVideo();
+	gfx.vsync = VSYNC_STRICT;
+	gfx.mode = mode;
+
+	// TODO: all this doesn't really belong here...
+	// tried adding to PWR_init() but that was no good (not sure why)
+
+	// Resolve the UI scale before CFG_init loads fonts: font= precedes
+	// uiscale= in the file and the font callback sizes every font by
+	// FIXED_SCALE. Done here, not in CFG_init, because config.c is also
+	// linked into tools without platform.c (nextval, poweroff_next).
+	char scale_path[MAX_PATH];
+	snprintf(scale_path, sizeof(scale_path), "%s/minuisettings.txt", SHARED_USERDATA_PATH);
+	ui_scale = UIScale_resolve(UIScale_readFile(scale_path), NATIVE_SCALE);
+	CFG_init(GFX_loadSystemFont, GFX_updateColors);
+
+	// Reapply only when the volatile symlink is missing or stale. Persisting an
+	// unchanged timezone on every app launch needlessly commits config and syncs
+	// the hardware clock on the transition path.
+	PLAT_initTimezones();
+	char* timezone = PLAT_getCurrentTimezone();
+	if (timezone) {
+		if (!GFX_timezoneIsApplied(timezone))
+			PLAT_setCurrentTimezone(timezone);
+		free(timezone);
+	}
+
+	PLAT_initLid();
+	LEDS_initLeds();
+
+	RGB_WHITE = SDL_MapRGB(gfx.screen->format, TRIAD_WHITE);
+	RGB_BLACK = SDL_MapRGB(gfx.screen->format, TRIAD_BLACK);
+	RGB_LIGHT_GRAY = SDL_MapRGB(gfx.screen->format, TRIAD_LIGHT_GRAY);
+	RGB_GRAY = SDL_MapRGB(gfx.screen->format, TRIAD_GRAY);
+	RGB_DARK_GRAY = SDL_MapRGB(gfx.screen->format, TRIAD_DARK_GRAY);
+
+	asset_rgbs[ASSET_WHITE_PILL] = RGB_WHITE;
+	asset_rgbs[ASSET_BLACK_PILL] = RGB_BLACK;
+	asset_rgbs[ASSET_DARK_GRAY_PILL] = RGB_DARK_GRAY;
+	asset_rgbs[ASSET_OPTION] = RGB_DARK_GRAY;
+	asset_rgbs[ASSET_BUTTON] = RGB_WHITE;
+	asset_rgbs[ASSET_WHITE_RECT] = RGB_WHITE;
+	asset_rgbs[ASSET_BLACK_RECT] = RGB_BLACK;
+	asset_rgbs[ASSET_DARK_GRAY_RECT] = RGB_DARK_GRAY;
+	asset_rgbs[ASSET_OPTION_RECT] = RGB_DARK_GRAY;
+	asset_rgbs[ASSET_BUTTON_RECT] = RGB_WHITE;
+	asset_rgbs[ASSET_PAGE_BG] = RGB_WHITE;
+	asset_rgbs[ASSET_STATE_BG] = RGB_WHITE;
+	asset_rgbs[ASSET_PAGE] = RGB_BLACK;
+	asset_rgbs[ASSET_BAR] = RGB_WHITE;
+	asset_rgbs[ASSET_BAR_BG] = RGB_WHITE;
+	asset_rgbs[ASSET_BAR_BG_MENU] = RGB_WHITE;
+	asset_rgbs[ASSET_UNDERLINE] = RGB_GRAY;
+	asset_rgbs[ASSET_DOT] = RGB_LIGHT_GRAY;
+	asset_rgbs[ASSET_HOLE] = RGB_BLACK;
+
+	GFX_initAssetRects();
 
 	char asset_path[MAX_PATH];
 	sprintf(asset_path, "%s/assets@%ix.png", RES_PATH, FIXED_SCALE);
@@ -666,6 +681,32 @@ SDL_Surface* GFX_init(int mode) {
 	PLAT_clearAll();
 
 	return gfx.screen;
+}
+
+int GFX_reloadScale(void) {
+	int next = UIScale_resolve(CFG_getUIScale(), NATIVE_SCALE);
+	if (next == FIXED_SCALE)
+		return 0;
+
+	int prev = ui_scale;
+	ui_scale = next;
+	char asset_path[MAX_PATH];
+	sprintf(asset_path, "%s/assets@%ix.png", RES_PATH, FIXED_SCALE);
+	SDL_Surface* assets = IMG_Load(asset_path);
+	if (!assets) {
+		LOG_info("GFX_reloadScale: %s failed to load, keeping %ix\n", asset_path, prev ? prev : NATIVE_SCALE);
+		ui_scale = prev;
+		return -1;
+	}
+	SDL_FreeSurface(gfx.assets);
+	gfx.assets = assets;
+	GFX_initAssetRects();
+	GFX_resetNavGlyphs();
+
+	char font_path[MAX_PATH];
+	snprintf(font_path, sizeof(font_path), "%s/font1.ttf", RES_PATH);
+	GFX_loadSystemFont(font_path); // also clears the text cache
+	return 0;
 }
 
 SDL_Surface* GFX_getScreen(void) {
@@ -1568,6 +1609,16 @@ static struct NavGlyph {
 	{"LEFT/RIGHT", "nav_dpad_horizontal", NAV_IMAGE, NULL, 0},
 	{"UP/DOWN", "nav_dpad_vertical", NAV_IMAGE, NULL, 0},
 };
+// Glyph PNGs are per-scale (@2x/@3x); drop them so the next lookup loads the
+// current scale.
+static void GFX_resetNavGlyphs(void) {
+	for (int i = 0; i < (int)(sizeof(nav_glyphs) / sizeof(nav_glyphs[0])); i++) {
+		if (nav_glyphs[i].surf)
+			SDL_FreeSurface(nav_glyphs[i].surf);
+		nav_glyphs[i].surf = NULL;
+		nav_glyphs[i].tried = 0;
+	}
+}
 static struct NavGlyph* GFX_getNavGlyph(const char* button) {
 	if (!button || !button[0])
 		return NULL;

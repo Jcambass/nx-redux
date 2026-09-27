@@ -8,6 +8,13 @@
 #ifdef SDL
 #include "sdl.h"
 #endif
+#include "ui_scale.h"
+
+///////////////////////////////
+
+// UI scale picked in Settings → Appearance (minuisettings.txt uiscale=). 0 until
+// GFX_init resolves it, which means NATIVE_SCALE. See ui_scale.h.
+extern int ui_scale;
 
 ///////////////////////////////
 
@@ -120,7 +127,8 @@
 
 ///////////////////////////////
 
-#define FIXED_SCALE 2
+#define NATIVE_SCALE 2
+#define FIXED_SCALE (ui_scale ? ui_scale : NATIVE_SCALE)
 #define FIXED_WIDTH 1280
 #define FIXED_HEIGHT 720
 #define FIXED_BPP 2
@@ -130,9 +138,9 @@
 
 ///////////////////////////////
 
-#define MAIN_ROW_COUNT 10
-#define SETTINGS_ROW_COUNT 11
-#define PADDING 10
+#define MAIN_ROW_COUNT (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).main_rows)
+#define SETTINGS_ROW_COUNT (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).settings_rows)
+#define PADDING (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).padding)
 
 ///////////////////////////////
 

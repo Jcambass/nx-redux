@@ -307,6 +307,13 @@ static int hint_labels_values[] = {0, 1};
 // The "Hint labels" row only matters under the Xbox layout; hidden otherwise.
 static SettingItem* hint_labels_item = NULL;
 
+/* UI scale: 0 follows the device; label filled in build_menu_tree. Labels
+ * count from the smallest scale the UI offers, so internal 2x shows as "1x"
+ * and 3x as "2x"; stored values stay 0/2/3. */
+static char ui_scale_default_label[16];
+static const char* ui_scale_labels[] = {ui_scale_default_label, "1x", "2x"};
+static int ui_scale_values[] = {0, 2, 3};
+
 /* Dpad mode: Dpad, Joystick, Both */
 static const char* dpad_mode_labels[] = {"Dpad", "Joystick", "Both"};
 static int dpad_mode_values[] = {0, 1, 2};
@@ -668,6 +675,22 @@ static void set_game_art_type(int v) {
 }
 static void reset_game_art_type(void) {
 	CFG_setGameArtType(CFG_DEFAULT_GAMEARTTYPE);
+}
+
+/* UI scale: applies to Settings immediately, to everything else on next start */
+static int get_ui_scale(void) {
+	return CFG_getUIScale();
+}
+static void set_ui_scale(int v) {
+	int prev = CFG_getUIScale();
+	CFG_setUIScale(v);
+	if (GFX_reloadScale() != 0)
+		CFG_setUIScale(prev); // asset sheet failed to load: keep the working scale
+	else
+		settings_menu_invalidate_layout(); // drop old-scale list pixel state
+}
+static void reset_ui_scale(void) {
+	set_ui_scale(CFG_DEFAULT_UI_SCALE);
 }
 
 /* Show folder names at root */
@@ -1658,8 +1681,12 @@ static void build_menu_tree(const DeviceInfo* dev) {
 	// ============================
 	// Appearance page
 	// ============================
+	snprintf(ui_scale_default_label, sizeof(ui_scale_default_label), "Default (%ix)", NATIVE_SCALE - 1);
 	idx = 0;
 	// Font selection removed — the UI always uses the MiSans-based font.
+	appearance_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
+		"UI scale", "Size of text and menus. Larger scales show fewer rows.",
+		ui_scale_labels, 3, ui_scale_values, get_ui_scale, set_ui_scale, reset_ui_scale);
 	appearance_items[idx++] = (SettingItem)ITEM_COLOR_INIT(
 		"Main color", "The color used to render main UI elements.",
 		color_labels, COLOR_COUNT, (int*)color_values, get_color1, set_color1, reset_color1);

@@ -8,19 +8,24 @@
 #ifdef SDL
 #include "sdl.h"
 #endif
+#include "ui_scale.h"
 
 ///////////////////////////////
 
 // Brick and Brick Pro share the 1024x768 panel *resolution* (FIXED_WIDTH/HEIGHT key
-// off is_brick || is_brickpro), but NOT the UI scale: the Brick is a small panel
-// where 3x is right, while the Brick Pro's panel is physically much larger (about
-// the Smart Pro S's height), so 3x renders everything ~1.4x too big. The Brick Pro
-// therefore uses the Smart Pro's 2x layout (FIXED_SCALE / MAIN_ROW_COUNT /
-// SETTINGS_ROW_COUNT / PADDING key off is_brick alone) to match it visually. Input
+// off is_brick || is_brickpro), but NOT the default UI scale: the Brick is a small
+// panel where 3x is right, while the Brick Pro's panel is physically much larger
+// (about the Smart Pro S's height), so 3x renders everything ~1.4x too big. The
+// Brick Pro therefore defaults to the Smart Pro's 2x layout (NATIVE_SCALE keys off
+// is_brick alone); the user can override either device in Settings → Appearance →
+// UI scale, and the row counts / padding follow the chosen scale via ui_scale.h. Input
 // still keys off is_brick || is_brickpro: the Brick Pro additionally has analog
 // sticks, two extra shoulder buttons (L4/R4) and a HOME key.
 extern int is_brick;
 extern int is_brickpro;
+// UI scale picked in Settings → Appearance (minuisettings.txt uiscale=). 0 until
+// GFX_init resolves it, which means NATIVE_SCALE. See ui_scale.h.
+extern int ui_scale;
 
 ///////////////////////////////
 
@@ -155,7 +160,8 @@ extern int is_brickpro;
 
 ///////////////////////////////
 
-#define FIXED_SCALE (is_brick ? 3 : 2) // Brick Pro uses 2x (see the panel note above)
+#define NATIVE_SCALE (is_brick ? 3 : 2) // Brick Pro defaults to 2x (see the panel note above)
+#define FIXED_SCALE (ui_scale ? ui_scale : NATIVE_SCALE)
 #define FIXED_WIDTH (is_brick || is_brickpro ? 1024 : 1280)
 #define FIXED_HEIGHT (is_brick || is_brickpro ? 768 : 720)
 #define FIXED_BPP 2
@@ -165,11 +171,12 @@ extern int is_brickpro;
 
 ///////////////////////////////
 
-// Brick Pro runs the Smart Pro's 2x layout but on a taller panel (768 vs 720), so it
-// fits one extra main-menu row (11 vs 10). Settings/padding stay on the shared 2x values.
-#define MAIN_ROW_COUNT (is_brick ? 7 : (is_brickpro ? 11 : 10))
-#define SETTINGS_ROW_COUNT (is_brick ? 9 : 11)
-#define PADDING (is_brick ? 5 : 10)
+// Per-scale layout tables live in ui_scale.h, keyed on panel height: at 2x the
+// Brick Pro's taller panel (768 vs 720) fits one extra main-menu row (11 vs 10).
+// Settings/padding stay on the shared 2x values.
+#define MAIN_ROW_COUNT (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).main_rows)
+#define SETTINGS_ROW_COUNT (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).settings_rows)
+#define PADDING (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).padding)
 
 ///////////////////////////////
 

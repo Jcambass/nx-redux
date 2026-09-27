@@ -109,6 +109,7 @@ void CFG_defaults(NextUISettings* cfg) {
 		.debugLogging = CFG_DEFAULT_DEBUG_LOGGING,
 		.buttonLayout = CFG_DEFAULT_BUTTON_LAYOUT,
 		.hintLabels = CFG_DEFAULT_HINT_LABELS,
+		.uiScale = CFG_DEFAULT_UI_SCALE,
 	};
 
 	*cfg = defaults;
@@ -380,6 +381,10 @@ void CFG_init(FontLoad_callback_t cb, ColorSet_callback_t ccb) {
 			}
 			if (sscanf(line, "hintlabels=%i", &temp_value) == 1) {
 				CFG_setHintLabels((bool)temp_value);
+				continue;
+			}
+			if (UIScale_parseLine(line, &temp_value)) {
+				CFG_setUIScale(temp_value);
 				continue;
 			}
 			if (sscanf(line, "keepAwakeUSB=%i", &temp_value) == 1) {
@@ -1067,6 +1072,15 @@ void CFG_setHintLabels(bool physical) {
 	CFG_sync();
 }
 
+int CFG_getUIScale(void) {
+	return settings.uiScale;
+}
+
+void CFG_setUIScale(int scale) {
+	settings.uiScale = UIScale_sanitize(scale);
+	CFG_sync();
+}
+
 void CFG_get(const char* key, char* value) {
 	if (strcmp(key, "font") == 0) {
 		sprintf(value, "%i", CFG_getFontId());
@@ -1166,6 +1180,8 @@ void CFG_get(const char* key, char* value) {
 		sprintf(value, "%i", CFG_getButtonLayout());
 	} else if (strcmp(key, "hintlabels") == 0) {
 		sprintf(value, "%i", (int)(CFG_getHintLabels()));
+	} else if (strcmp(key, "uiscale") == 0) {
+		sprintf(value, "%i", CFG_getUIScale());
 	}
 
 	// meta, not a real setting
@@ -1256,6 +1272,7 @@ static int CFG_serialize(char* buf, size_t cap) {
 	EMIT("debugLogging=%i\n", settings.debugLogging);
 	EMIT("buttonlayout=%i\n", settings.buttonLayout);
 	EMIT("hintlabels=%i\n", settings.hintLabels);
+	EMIT("uiscale=%i\n", settings.uiScale);
 #undef EMIT
 	return (int)off;
 }
@@ -1476,6 +1493,7 @@ void CFG_print(void) {
 	printf("\t\"debugLogging\": %i,\n", settings.debugLogging);
 	printf("\t\"buttonlayout\": %i,\n", settings.buttonLayout);
 	printf("\t\"hintlabels\": %i,\n", settings.hintLabels);
+	printf("\t\"uiscale\": %i,\n", settings.uiScale);
 
 	// meta, not a real setting
 	printf("\t\"fontpath\": \"%s/font1.ttf\"\n", RES_PATH);

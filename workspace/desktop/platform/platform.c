@@ -26,6 +26,8 @@
 
 #include <dirent.h>
 
+int ui_scale = 0;
+
 void PLAT_initInput(void) {
 	// SDL_INIT_GAMECONTROLLER implies SDL_INIT_JOYSTICK. Controllers present now
 	// arrive as SDL_CONTROLLERDEVICEADDED on the first event pump and are opened

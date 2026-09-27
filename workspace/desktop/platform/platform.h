@@ -6,6 +6,13 @@
 ///////////////////////////////
 
 #include "sdl.h"
+#include "ui_scale.h"
+
+///////////////////////////////
+
+// UI scale picked in Settings → Appearance (minuisettings.txt uiscale=). 0 until
+// GFX_init resolves it, which means NATIVE_SCALE. See ui_scale.h.
+extern int ui_scale;
 
 ///////////////////////////////
 
@@ -136,12 +143,13 @@
 // is sized for a tiny handheld panel and renders oversized on a monitor —
 // the same reason the physically-larger Brick Pro runs the 2x layout (see
 // workspace/tg5040/platform/platform.h's panel note).
-#define FIXED_SCALE 2
+#define NATIVE_SCALE 2
+#define FIXED_SCALE (ui_scale ? ui_scale : NATIVE_SCALE)
 #define FIXED_WIDTH 1024
 #define FIXED_HEIGHT 768
-#define MAIN_ROW_COUNT 11
-#define SETTINGS_ROW_COUNT 11
-#define PADDING 10
+#define MAIN_ROW_COUNT (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).main_rows)
+#define SETTINGS_ROW_COUNT (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).settings_rows)
+#define PADDING (UIScale_layout(FIXED_HEIGHT, FIXED_SCALE).padding)
 
 // emulate TSP
 //#define FIXED_SCALE 	2

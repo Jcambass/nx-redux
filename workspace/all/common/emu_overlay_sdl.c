@@ -11,6 +11,7 @@
 
 #include "emu_overlay_sdl.h"
 #include "text_shape.h"
+#include "ui_scale.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -176,12 +177,8 @@ static int ovl_sdl_init(int screen_w, int screen_h) {
 	s_screenW = screen_w;
 	s_screenH = screen_h;
 
-	// Scale factor: match NextUI's FIXED_SCALE
-	// Brick (1024x768) = 3x, Smart Pro / TG5050 (1280x720) = 2x
-	if (screen_w <= 1024)
-		s_scale = 3;
-	else
-		s_scale = 2;
+	// Same scale as the rest of NX Redux (Settings → Appearance → UI scale).
+	s_scale = UIScale_fromEnvironment();
 
 	// Initialize SDL_ttf
 	if (!TTF_WasInit()) {

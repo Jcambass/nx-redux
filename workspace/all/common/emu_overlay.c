@@ -1,4 +1,5 @@
 #include "emu_overlay.h"
+#include "ui_scale.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -114,18 +115,9 @@ int emu_ovl_init(EmuOvl* ovl, EmuOvlConfig* cfg, EmuOvlRenderBackend* render,
 	if (game_name)
 		snprintf(ovl->game_name, sizeof(ovl->game_name), "%s", game_name);
 
-	// Scale factor: match NextUI's FIXED_SCALE
-	// Brick (1024x768) = 3x, Smart Pro / TG5050 (1280x720) = 2x
-	if (screen_w <= 1024)
-		ovl_scale = 3;
-	else
-		ovl_scale = 2;
-
-	// Items per page: Brick = 5, Smart Pro / TG5050 = 9
-	if (screen_w <= 1024)
-		ovl->items_per_page = 5;
-	else
-		ovl->items_per_page = 8;
+	// Same scale as the rest of NX Redux (Settings → Appearance → UI scale).
+	ovl_scale = UIScale_fromEnvironment();
+	ovl->items_per_page = UIScale_layout(screen_h, ovl_scale).overlay_items;
 
 	build_main_menu(ovl);
 

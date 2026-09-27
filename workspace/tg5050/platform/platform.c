@@ -28,6 +28,8 @@
 
 #include <dirent.h>
 
+int ui_scale = 0;
+
 static SDL_Joystick** joysticks = NULL;
 static int num_joysticks = 0;
 void PLAT_initInput(void) {
