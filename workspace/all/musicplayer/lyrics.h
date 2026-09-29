@@ -12,8 +12,9 @@ typedef struct {
 // Maximum number of lyric lines
 #define LYRICS_MAX_LINES 512
 
-// Fetch lyrics for artist/title (non-blocking, runs in background thread)
-void Lyrics_fetch(const char* artist, const char* title, int duration_sec);
+// Fetch lyrics for a track (non-blocking, runs in background thread): lyrics
+// embedded in filepath first, then the cache / LRCLIB by artist+title
+void Lyrics_fetch(const char* filepath, const char* artist, const char* title, int duration_sec);
 
 // Clear current lyrics and reset state
 void Lyrics_clear(void);

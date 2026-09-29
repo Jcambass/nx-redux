@@ -2,6 +2,7 @@
 #include "radio.h"
 #include "album_art.h"
 #include "settings.h"
+#include "tag_meta.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -239,8 +240,21 @@ static int get_target_sample_rate(int source_rate) {
 static void on_audio_device_changed(int sink_type);
 static int start_stream_thread(void);
 
+// Vorbis comment (FLAC/Ogg/Opus) tag state for one decoder open. adopt_art is
+// false for Player_validate()'s throwaway open, which must not replace the
+// playing track's cover.
+typedef struct {
+	TrackInfo* info;
+	bool adopt_art;
+	bool have_title;
+	bool have_artist;
+	bool artist_from_album_artist;
+	bool have_album;
+} TagContext;
+
 // Forward declaration for FLAC metadata callback
 static void flac_metadata_callback(void* pUserData, drflac_metadata* pMetadata);
+static void apply_vorbis_comment(TagContext* ctx, const char* comment, size_t len);
 
 // ============ STREAMING PLAYBACK SYSTEM ============
 
@@ -397,7 +411,9 @@ static int stream_decoder_open(StreamDecoder* sd, const char* filepath, TrackInf
 		break;
 	}
 	case AUDIO_FORMAT_FLAC: {
-		drflac* flac = drflac_open_file_with_metadata(filepath, flac_metadata_callback, metadata, NULL);
+		// The metadata callback runs synchronously inside the open call
+		TagContext tags = {metadata, metadata == &player.track_info};
+		drflac* flac = drflac_open_file_with_metadata(filepath, flac_metadata_callback, &tags, NULL);
 		if (!flac) {
 			LOG_error("Stream: Failed to open FLAC: %s\n", filepath);
 			return -1;
@@ -2263,67 +2279,107 @@ static void parse_m4a_metadata(void) {
 	}
 }
 
-// Parse Vorbis comments (for OGG and FLAC)
-static void parse_vorbis_comment(const char* comment) {
-	if (!comment)
+// Whether player.album_art is a front cover (ID3/FLAC picture type 3)
+static bool album_art_is_front = false;
+
+// Adopt an embedded picture as the album art. The first picture is kept until
+// a front cover turns up, which then wins over any other picture type.
+static void adopt_embedded_picture(const uint8_t* data, size_t size, uint32_t type) {
+	if (!data || size == 0)
+		return;
+	bool is_front = type == TAG_PICTURE_FRONT_COVER;
+	if (player.album_art && (album_art_is_front || !is_front))
+		return;
+	SDL_RWops* rw = SDL_RWFromConstMem(data, (int)size);
+	if (!rw)
+		return;
+	SDL_Surface* art = IMG_Load_RW(rw, 1); // 1 = auto-close RWops
+	if (!art)
+		return;
+	if (player.album_art)
+		SDL_FreeSurface(player.album_art);
+	player.album_art = art;
+	album_art_is_front = is_front;
+}
+
+// Apply one "KEY=value" Vorbis comment (FLAC, Ogg Vorbis, Opus). The first
+// non-empty value of a field wins; ALBUMARTIST fills in a missing ARTIST.
+static void apply_vorbis_comment(TagContext* ctx, const char* comment, size_t len) {
+	const char* value;
+	size_t value_len;
+	TagField field = TagMeta_vorbisField(comment, len, &value, &value_len);
+	if (field == TAG_FIELD_NONE)
 		return;
 
-	// Vorbis comments are in format "KEY=VALUE"
-	const char* eq = strchr(comment, '=');
-	if (!eq)
+	if (field == TAG_FIELD_PICTURE) {
+		if (!ctx->adopt_art)
+			return;
+		const uint8_t* image;
+		size_t image_size;
+		uint32_t type;
+		uint8_t* block = TagMeta_decodeBlockPicture(value, value_len, &image, &image_size, &type);
+		if (block) {
+			adopt_embedded_picture(image, image_size, type);
+			free(block);
+		}
 		return;
+	}
 
-	size_t key_len = eq - comment;
-	const char* value = eq + 1;
+	char text[256];
+	size_t n = value_len < sizeof(text) - 1 ? value_len : sizeof(text) - 1;
+	memcpy(text, value, n);
+	text[n] = '\0';
 
-	if (strncasecmp(comment, "TITLE", key_len) == 0 && key_len == 5) {
-		copy_metadata_string(player.track_info.title, value, sizeof(player.track_info.title));
-	} else if (strncasecmp(comment, "ARTIST", key_len) == 0 && key_len == 6) {
-		copy_metadata_string(player.track_info.artist, value, sizeof(player.track_info.artist));
-	} else if (strncasecmp(comment, "ALBUM", key_len) == 0 && key_len == 5) {
-		copy_metadata_string(player.track_info.album, value, sizeof(player.track_info.album));
+	TrackInfo* info = ctx->info;
+	switch (field) {
+	case TAG_FIELD_TITLE:
+		if (!ctx->have_title) {
+			copy_metadata_string(info->title, text, sizeof(info->title));
+			ctx->have_title = true;
+		}
+		break;
+	case TAG_FIELD_ARTIST:
+		if (!ctx->have_artist || ctx->artist_from_album_artist) {
+			copy_metadata_string(info->artist, text, sizeof(info->artist));
+			ctx->have_artist = true;
+			ctx->artist_from_album_artist = false;
+		}
+		break;
+	case TAG_FIELD_ALBUM_ARTIST:
+		if (!ctx->have_artist) {
+			copy_metadata_string(info->artist, text, sizeof(info->artist));
+			ctx->have_artist = true;
+			ctx->artist_from_album_artist = true;
+		}
+		break;
+	case TAG_FIELD_ALBUM:
+		if (!ctx->have_album) {
+			copy_metadata_string(info->album, text, sizeof(info->album));
+			ctx->have_album = true;
+		}
+		break;
+	default:
+		break;
 	}
 }
 
-// FLAC metadata callback
+// FLAC metadata callback (pUserData is a TagContext)
 static void flac_metadata_callback(void* pUserData, drflac_metadata* pMetadata) {
-	TrackInfo* track_info = pUserData;
+	TagContext* ctx = pUserData;
 
 	if (pMetadata->type == DRFLAC_METADATA_BLOCK_TYPE_VORBIS_COMMENT) {
-		// Parse Vorbis comments
-		const drflac_vorbis_comment_iterator* comments = NULL;
-		uint32_t commentCount = pMetadata->data.vorbis_comment.commentCount;
-		const char* pComments = pMetadata->data.vorbis_comment.pComments;
-
-		// Iterate through comments
-		for (uint32_t i = 0; i < commentCount; i++) {
-			uint32_t commentLength;
-			if (pComments) {
-				// Read comment length (little-endian 32-bit)
-				commentLength = *(const uint32_t*)pComments;
-				pComments += 4;
-
-				// Create null-terminated copy
-				char* comment = malloc(commentLength + 1);
-				if (comment) {
-					memcpy(comment, pComments, commentLength);
-					comment[commentLength] = '\0';
-					const char* eq = strchr(comment, '=');
-					if (eq) {
-						size_t key_len = (size_t)(eq - comment);
-						if (key_len == 5 && strncasecmp(comment, "TITLE", key_len) == 0)
-							copy_metadata_string(track_info->title, eq + 1, sizeof(track_info->title));
-						else if (key_len == 6 && strncasecmp(comment, "ARTIST", key_len) == 0)
-							copy_metadata_string(track_info->artist, eq + 1, sizeof(track_info->artist));
-						else if (key_len == 5 && strncasecmp(comment, "ALBUM", key_len) == 0)
-							copy_metadata_string(track_info->album, eq + 1, sizeof(track_info->album));
-					}
-					free(comment);
-				}
-
-				pComments += commentLength;
-			}
-		}
+		drflac_vorbis_comment_iterator it;
+		drflac_init_vorbis_comment_iterator(&it, pMetadata->data.vorbis_comment.commentCount,
+											pMetadata->data.vorbis_comment.pComments);
+		drflac_uint32 comment_len;
+		const char* comment;
+		while ((comment = drflac_next_vorbis_comment(&it, &comment_len)) != NULL)
+			apply_vorbis_comment(ctx, comment, comment_len);
+	} else if (pMetadata->type == DRFLAC_METADATA_BLOCK_TYPE_PICTURE && ctx->adopt_art) {
+		// pPictureData is only valid inside this callback; NULL when dr_flac
+		// could not allocate it (then there is nothing to load)
+		adopt_embedded_picture(pMetadata->data.picture.pPictureData,
+							   pMetadata->data.picture.pictureDataSize, pMetadata->data.picture.type);
 	}
 }
 
@@ -2451,9 +2507,17 @@ int Player_load(const char* filepath) {
 			OggOpusFile* of = (OggOpusFile*)player.stream_decoder.decoder;
 			const OpusTags* tags = op_tags(of, -1);
 			if (tags) {
+				TagContext ctx = {&player.track_info, true};
 				for (int i = 0; i < tags->comments; i++)
-					parse_vorbis_comment(tags->user_comments[i]);
+					apply_vorbis_comment(&ctx, tags->user_comments[i], (size_t)tags->comment_lengths[i]);
 			}
+		}
+		// Parse metadata for Ogg Vorbis (stb_vorbis keeps the comment header)
+		if (result == 0 && format == AUDIO_FORMAT_OGG) {
+			stb_vorbis_comment tags = stb_vorbis_get_comment((stb_vorbis*)player.stream_decoder.decoder);
+			TagContext ctx = {&player.track_info, true};
+			for (int i = 0; i < tags.comment_list_length; i++)
+				apply_vorbis_comment(&ctx, tags.comment_list[i], strlen(tags.comment_list[i]));
 		}
 		pthread_mutex_unlock(&player.mutex);
 
@@ -2567,6 +2631,7 @@ void Player_stop(void) {
 		SDL_FreeSurface(player.album_art);
 		player.album_art = NULL;
 	}
+	album_art_is_front = false;
 
 	// Clear any internet-fetched album art
 	album_art_clear();

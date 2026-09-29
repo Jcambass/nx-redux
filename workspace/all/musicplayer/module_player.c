@@ -118,7 +118,7 @@ static bool sync_owner_presentation(const MusicSnapshotWire* snapshot) {
 		changed = true;
 	}
 	if (Settings_getLyricsEnabled())
-		Lyrics_fetch(snapshot->artist, snapshot->title, snapshot->duration_ms / 1000);
+		Lyrics_fetch(snapshot->current_file, snapshot->artist, snapshot->title, snapshot->duration_ms / 1000);
 	return changed;
 }
 
@@ -518,7 +518,7 @@ static bool handle_playing_input(SDL_Surface* screen, PlayerInternalState* state
 		} else {
 			// Re-fetch lyrics from copied daemon metadata.
 			const MusicSnapshotWire* snapshot = MusicClient_snapshot();
-			Lyrics_fetch(snapshot->artist, snapshot->title, snapshot->duration_ms / 1000);
+			Lyrics_fetch(snapshot->current_file, snapshot->artist, snapshot->title, snapshot->duration_ms / 1000);
 		}
 		*dirty = 1;
 	} else if (PAD_tappedSelect(SDL_GetTicks())) {
@@ -948,7 +948,7 @@ ModuleExitReason PlayerModule_runWithPlaylist(SDL_Surface* screen,
 				Lyrics_clear();
 			} else {
 				const MusicSnapshotWire* snapshot = MusicClient_snapshot();
-				Lyrics_fetch(snapshot->artist, snapshot->title, snapshot->duration_ms / 1000);
+				Lyrics_fetch(snapshot->current_file, snapshot->artist, snapshot->title, snapshot->duration_ms / 1000);
 			}
 			dirty = 1;
 		} else if (PAD_tappedSelect(SDL_GetTicks())) {
