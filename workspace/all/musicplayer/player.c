@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <strings.h>
 #include <unistd.h>
+#include <time.h>
 #include <math.h>
 #include <samplerate.h>
 #include <SDL2/SDL_image.h>
@@ -1468,6 +1469,28 @@ static void prepare_stream_for_device_close(void) {
 
 // ============ END STREAMING PLAYBACK SYSTEM ============
 
+// Take player.mutex from the audio callback. A failed lock makes the callback
+// emit a whole period of silence without consuming the stream, an audible
+// stutter (#126). Every other holder keeps the mutex for microseconds, but it
+// is taken hundreds of times a second (decode thread, service snapshots), so a
+// bare trylock collided every 13-30 s on a Brick. Wait briefly instead. The
+// wait must stay bounded: pause/stop/close hold player.mutex while calling
+// SDL_PauseAudioDevice/SDL_CloseAudioDevice, which wait for this callback to
+// return, so an unbounded lock here would deadlock them.
+#define AUDIO_CALLBACK_LOCK_WAIT_NS 2000000
+static int lock_for_callback(pthread_mutex_t* mutex) {
+	if (pthread_mutex_trylock(mutex) == 0)
+		return 0;
+	struct timespec deadline;
+	clock_gettime(CLOCK_REALTIME, &deadline);
+	deadline.tv_nsec += AUDIO_CALLBACK_LOCK_WAIT_NS;
+	if (deadline.tv_nsec >= 1000000000L) {
+		deadline.tv_sec++;
+		deadline.tv_nsec -= 1000000000L;
+	}
+	return pthread_mutex_timedlock(mutex, &deadline);
+}
+
 // Audio callback - SDL pulls audio data from here
 static void audio_callback(void* userdata, Uint8* stream, int len) {
 	PlayerContext* ctx = (PlayerContext*)userdata;
@@ -1475,7 +1498,7 @@ static void audio_callback(void* userdata, Uint8* stream, int len) {
 	int16_t* out = (int16_t*)stream;
 	// Volume is shared with UI/service writers; take a short lock-protected copy
 	// before the radio branch, which otherwise bypasses the callback lock.
-	if (pthread_mutex_trylock(&ctx->mutex) != 0) {
+	if (lock_for_callback(&ctx->mutex) != 0) {
 		memset(stream, 0, len);
 		return;
 	}
@@ -1528,8 +1551,7 @@ static void audio_callback(void* userdata, Uint8* stream, int len) {
 		return;
 	}
 
-	// Try to lock, if can't, output silence (non-blocking to prevent crackling)
-	if (pthread_mutex_trylock(&ctx->mutex) != 0) {
+	if (lock_for_callback(&ctx->mutex) != 0) {
 		memset(stream, 0, len);
 		return;
 	}
