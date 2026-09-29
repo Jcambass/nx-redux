@@ -1,11 +1,14 @@
 #include "ma_internal.h"
 #include "utils.h"
 #include "ma_environment.h"
+#include "ma_hwrender.h"
+#include "ma_core.h"
 #include "ma_input.h"
 #include "ma_config.h"
 #include "ma_options.h"
 #include "ma_opts_dump.h"
 #include "ra_integration.h"
+#include "core_netplay.h"
 #include "gbalink.h"
 
 static bool set_rumble_state(unsigned port, enum retro_rumble_effect effect, uint16_t strength) {
@@ -52,6 +55,7 @@ bool environment_callback(unsigned cmd, void* data) { // copied from picoarch in
 		// exit. Without this the request is silently dropped and the main loop
 		// keeps running a core that has given up.
 		LOG_info("Core requested shutdown\n");
+		CoreNetplay_markEnded(); // a GGPO core stops like this when the peer is gone
 		quit = 1;
 		break;
 	}
@@ -362,16 +366,40 @@ bool environment_callback(unsigned cmd, void* data) { // copied from picoarch in
 	// 	break;
 	// };
 	case RETRO_ENVIRONMENT_SET_HW_RENDER: {
-		struct retro_hw_render_callback* cb = (struct retro_hw_render_callback*)data;
-
-		// Fallback if version is 0.0 or other unexpected values
-		if (cb->context_type == 4 && cb->version_major == 0 && cb->version_minor == 0) {
-			cb->context_type = RETRO_HW_CONTEXT_OPENGLES3;
-			cb->version_major = 3;
-			cb->version_minor = 0;
-		}
-
+#if defined(HAS_RUNTIME_PATHS)
+		return false; // desktop: no GPU-core path (its context is desktop GL, not GLES)
+#else
+		return HWR_setCallback((struct retro_hw_render_callback*)data);
+#endif
+	}
+	case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: { /* 32 */
+		// GPU cores only: software cores keep today's "unsupported" answer
+		// until this is verified across the bundled cores.
+		const struct retro_system_av_info* av = (const struct retro_system_av_info*)data;
+		if (!av || !HWR_active())
+			return false;
+		// the core renders the new size in this same retro_run
+		HWR_growFramebuffer(av->geometry.max_width, av->geometry.max_height);
+		Core_setPendingAVInfo(av);
 		return true;
+	}
+	case RETRO_ENVIRONMENT_SET_GEOMETRY: { /* 37 */
+		const struct retro_game_geometry* geometry = (const struct retro_game_geometry*)data;
+		if (!geometry || !HWR_active())
+			return false;
+		HWR_growFramebuffer(geometry->max_width, geometry->max_height);
+		Core_setPendingGeometry(geometry);
+		return true;
+	}
+	case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER: {
+#if defined(HAS_RUNTIME_PATHS)
+		return false;
+#else
+		if (!data)
+			return false;
+		*(unsigned*)data = RETRO_HW_CONTEXT_OPENGLES3;
+		return true;
+#endif
 	}
 	case RETRO_ENVIRONMENT_SET_NETPACKET_INTERFACE: {
 		const struct retro_netpacket_callback* cb =

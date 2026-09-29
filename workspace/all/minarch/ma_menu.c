@@ -1,6 +1,10 @@
 #include "ma_internal.h"
+#include "ma_emutime.h"
 #include "netplay.h"
 #include "utils.h"
+#include "arcade_names.h"
+#include "core_netplay.h"
+#include "ui_confirmdialog.h"
 #include "config.h"
 #include "ui_list.h"
 #include "ui_buttonhintbar.h"
@@ -129,15 +133,27 @@ void Menu_quit(void) {
 void Menu_beforeSleep() {
 	SRAM_write();
 	RTC_write();
-	State_autosave();
-	if (prefixMatch(SDCARD_PATH, game.path))
-		putFile(AUTO_RESUME_PATH, game.path + strlen(SDCARD_PATH));
+	if (Multiplayer_isActive()) {
+		// No state, no auto-resume: a netplay session can't be resumed, and
+		// serializing flycast stops its emulator, which silently ends GGPO.
+		// Sleeping (or powering off) in a core-run session is leaving it: tell
+		// the other player now, and quit to the list on wake.
+		if (CoreNetplay_isActive()) {
+			CoreNetplay_byeSend(CORE_NETPLAY_BYE_PORT);
+			quit = 1;
+		}
+	} else {
+		State_autosave();
+		if (prefixMatch(SDCARD_PATH, game.path))
+			putFile(AUTO_RESUME_PATH, game.path + strlen(SDCARD_PATH));
+	}
 
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
 }
 void Menu_afterSleep() {
 	unlink(AUTO_RESUME_PATH);
 	setOverclock(overclock);
+	EmuTime_reset();
 }
 static int ach_compare_unlocked_first(const void* a, const void* b) {
 	const rc_client_achievement_t* achA = *(const rc_client_achievement_t**)a;
@@ -884,6 +900,33 @@ void OptionAchievements_updateDesc(void) {
 	options_menu.items[6].desc = NULL;
 }
 
+// Arcade zips without a map.txt alias get the title the launcher shows for them
+// (.system/res/arcade/<TAG>.txt, keyed by the Roms folder's tag), so the menu
+// says "Metal Slug 6" rather than "mslug6". Leaves name alone otherwise. The
+// table is only read for .zip/.7z files, once per game: the answer is cached by
+// ROM path, so later menu opens don't re-parse it (FBN.txt has ~8000 lines).
+static void getArcadeTitle(const char* path, char* name) {
+	static char cached_path[MAX_PATH];
+	static char cached_title[MAX_PATH]; // "" = the table has no title for it
+	if (!ArcadeNames_isArcadeFile(baseName(path)))
+		return;
+	if (strcmp(cached_path, path) != 0) {
+		cached_title[0] = '\0';
+		char tag[MAX_PATH];
+		getEmuName(path, tag);
+		char table_path[MAX_PATH];
+		snprintf(table_path, sizeof(table_path), "%s/arcade/%s.txt", RES_PATH, tag);
+		ArcadeNames* names = ArcadeNames_load(table_path);
+		const char* title = ArcadeNames_get(names, baseName(path));
+		if (title && strcmp(title, ".") != 0)
+			snprintf(cached_title, sizeof(cached_title), "%s", title);
+		ArcadeNames_free(names);
+		snprintf(cached_path, sizeof(cached_path), "%s", path);
+	}
+	if (cached_title[0])
+		snprintf(name, MAX_PATH, "%s", cached_title);
+}
+
 // alias must be at least MAX_PATH bytes
 bool getAlias(char* path, char* alias) {
 	bool is_alias = false;
@@ -1410,6 +1453,75 @@ void Menu_undoLoadState(void) {
 	}
 }
 
+// During any netplay session MENU only asks whether to leave: states, rewind
+// and fast-forward are off anyway, and a menu left open stalls the other player.
+// minarch's own engines pause both sides cleanly, so their dialog simply waits;
+// a session the core runs itself (flycast GGPO) can't pause, the other
+// player's game just waits for this one, so no answer within the grace ends
+// the session (leaves), well before the core's disconnect timeout.
+typedef struct {
+	uint32_t start;
+	int seconds_left; // -1: no countdown
+} LeaveNetplayCtx;
+
+static void leaveNetplay_render(SDL_Surface* dst, void* data) {
+	LeaveNetplayCtx* ctx = data;
+	char subtitle[128];
+	if (ctx->seconds_left >= 0)
+		snprintf(subtitle, sizeof(subtitle), "The other player is waiting: %d s left.", ctx->seconds_left);
+	else
+		snprintf(subtitle, sizeof(subtitle), "Leaving ends the netplay session.");
+	UI_renderConfirmDialogHints(dst, "Leave netplay?", subtitle, (char*[]){"B", "CONTINUE", "A", "LEAVE", NULL});
+}
+
+static int leaveNetplay_handle(void* data) {
+	LeaveNetplayCtx* ctx = data;
+	if (Netplay_isConnected())
+		Netplay_pollWhilePaused(); // keep the lockstep link alive, as the full menu did
+	if (CoreNetplay_byePoll()) {   // the other player left meanwhile
+		CoreNetplay_markEnded();
+		return 1;
+	}
+	if (PAD_justPressed(BTN_A))
+		return 1;
+	if (PAD_justPressed(BTN_B) || PAD_justPressed(BTN_MENU))
+		return 0;
+	if (ctx->seconds_left >= 0) {
+		int left = CoreNetplay_leaveSecondsLeft(ctx->start, SDL_GetTicks());
+		if (left != ctx->seconds_left) {
+			ctx->seconds_left = left;
+			return UI_MODAL_DIRTY;
+		}
+	}
+	return UI_MODAL_CONTINUE;
+}
+
+// true = leave the session (and the game)
+static bool Menu_leaveNetplay(void) {
+	bool timed = CoreNetplay_isActive();
+	LeaveNetplayCtx ctx = {SDL_GetTicks(), timed ? CORE_NETPLAY_LEAVE_GRACE_MS / 1000 : -1};
+	UI_ModalOpts opts = {
+		.screen = screen,
+		.render = leaveNetplay_render,
+		.handle = leaveNetplay_handle,
+		.ctx = &ctx,
+		.timeout_ms = timed ? CORE_NETPLAY_LEAVE_GRACE_MS : 0, // expiry returns -1: leave
+		.reset_pad = true,
+	};
+	return UI_modalLoop(&opts) != 0;
+}
+
+void Menu_netplayNotice(const char* title, const char* subtitle, int hold_ms) {
+	if (screen->w != DEVICE_WIDTH || screen->h != DEVICE_HEIGHT)
+		screen = GFX_resize(DEVICE_WIDTH, DEVICE_HEIGHT, DEVICE_PITCH);
+	GFX_clearShaders();
+	// the leave dialog's look, as a notice: no button row
+	UI_renderConfirmDialogHints(screen, title, subtitle, (char*[]){NULL});
+	GFX_flip(screen);
+	if (hold_ms > 0)
+		SDL_Delay(hold_ms);
+}
+
 void Menu_loop(void) {
 	menu.bitmap = Menu_captureScreenSurface(SDL_PIXELFORMAT_ARGB8888);
 	SDL_Surface* backing = SDL_CreateRGBSurfaceWithFormat(0, DEVICE_WIDTH, DEVICE_HEIGHT, 32, SDL_PIXELFORMAT_ARGB8888);
@@ -1448,7 +1560,8 @@ void Menu_loop(void) {
 	char* tmp;
 	char rom_name[MAX_PATH]; // without extension or cruft
 	getDisplayName(game.name, rom_name);
-	getAlias(game.path, rom_name);
+	if (!getAlias(game.path, rom_name))
+		getArcadeTitle(game.path, rom_name);
 
 	int rom_disc = -1;
 	char disc_name[16];
@@ -1470,6 +1583,13 @@ void Menu_loop(void) {
 
 	//set vid.blit to null for menu drawing no need for blitrender drawing
 	GFX_clearShaders();
+	if (Multiplayer_isActive()) {
+		if (Menu_leaveNetplay()) {
+			Netplay_quitAll(); // as the full menu's Quit: close the link cleanly
+			quit = 1;
+		}
+		show_menu = 0; // straight to the teardown below
+	}
 	while (show_menu) {
 		GFX_startFrame();
 		uint32_t now = SDL_GetTicks();
