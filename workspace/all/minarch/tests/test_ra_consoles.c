@@ -23,6 +23,8 @@ int main(void) {
 	CHECK(RA_getConsoleId("PSP") == RC_CONSOLE_PSP, "PSP -> RC_CONSOLE_PSP");
 	CHECK(RA_getConsoleId("DC") == RC_CONSOLE_DREAMCAST, "DC -> Dreamcast (control)");
 	CHECK(RA_getConsoleId("PS") == RC_CONSOLE_PLAYSTATION, "PS -> PlayStation (control)");
+	CHECK(RA_getConsoleId("WS") == RC_CONSOLE_WONDERSWAN, "WS -> WonderSwan");
+	CHECK(RA_getConsoleId("WSC") == RC_CONSOLE_WONDERSWAN, "WSC -> WonderSwan (Color shares the console)");
 	CHECK(RA_getConsoleId("NOPE") == RC_CONSOLE_UNKNOWN, "unknown tag -> unknown");
 	CHECK(RA_getConsoleId("") == RC_CONSOLE_UNKNOWN, "empty tag -> unknown");
 
