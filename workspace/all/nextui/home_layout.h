@@ -11,7 +11,9 @@
 // takes the Brick's arrangement, a wider one the Smart Pro S's 8-column grid.
 
 #define HOME_MAX_PINS 16
-#define HOME_MAX_TOP 8
+#define HOME_MAX_TOP 15		  // Continue, 2 games (the wide layout's game column), 12 tool squares
+#define HOME_WIDE_COL_GAMES 2 // the wide layout puts up to this many games in the top section, beside Continue
+#define HOME_TOOL_COLS 3	  // the tool squares' columns at most (more tools than fit are left off, see shortcuts.h)
 
 #define HOME_EDGE 51.0f		// the content's left and right margin
 #define HOME_GAP 30.0f		// between tiles
@@ -27,9 +29,8 @@ typedef struct {
 } HomeRect; // page coordinates (y = 0 at the screen top, unscrolled)
 
 typedef enum { HOME_TILE_CONTINUE,			  // Continue, or Pick a game
-			   HOME_TILE_GAME,				  // a pinned game in the rows (ref: its index in the games)
-			   HOME_TILE_TOOL,				  // a pinned tool's square (ref: its index in the tools)
-			   HOME_TILE_MORE } HomeTileKind; // "+N" (ref: N), opens the Tools tab
+			   HOME_TILE_GAME,				  // a pinned game, in the rows or the wide game column (ref: its index)
+			   HOME_TILE_TOOL } HomeTileKind; // a pinned tool's square (ref: its index in the tools)
 typedef struct {
 	HomeTileKind kind;
 	int ref;
@@ -43,7 +44,7 @@ typedef struct {
 	float top_y, top_h;
 	float square, glyph; // the tool squares' side and glyph (0: no tools)
 	int ntop;
-	HomeTile top[HOME_MAX_TOP]; // Continue first, then the squares in reading order
+	HomeTile top[HOME_MAX_TOP]; // Continue first, then the column's games, then the squares in reading order
 	int k;						// pins per row
 	float pin_h;				// a pin row's height: HOME_PIN_H, more at the Small UI scale (the room the squares free)
 	int npins;
@@ -57,8 +58,11 @@ void HomeLayout_compute(float W, float H, float bar, int strip_lines, int ngames
 // The same with the stats strip's offsets (its baselines and the top section's start under it) strip_k times their
 // size: Home passes 3 / the UI scale, so the strip keeps the Large scale's size whatever the UI scale. strip_k > 1 (the
 // Small scale) with tools also keeps the tool squares' glyph at the Large size (46 × strip_k) and sizes the squares from
-// it (the glyph 58% of the side), so the top section is just their column (the Brick) or three-row block (the Smart Pro
-// S, filled a column at a time) tall and one pin row takes the rest.
+// it (the glyph 58% of the side), so the top section is just their three rows (filled a column at a time, a column per 3
+// tools) tall and one pin row takes the rest.
+// With no games (on a wide screen, up to HOME_WIDE_COL_GAMES) there are no pin rows: the top section runs down to the
+// hint bar, the tools are four rows of squares filling it (a column per 4 tools), a wide screen's games a column three
+// squares wide left of them (stacked, top tiles: npins 0), and Continue the rest.
 void HomeLayout_computeStrip(float W, float H, float bar, int strip_lines, float strip_k, int ngames, int ntools,
 							 HomeLayout* out);
 

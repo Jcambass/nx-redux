@@ -68,13 +68,11 @@
 #define PIN_SIDE 20.0f
 #define PIN_UP 16.0f
 #define PIN_LINE_GAP 4.0f
-#define MORE_PX 30.0f
 
 static const SDL_Color C_WHITE = {255, 255, 255, 255};
 static const SDL_Color C_BLACK = {0, 0, 0, 255};
 static const SDL_Color C_GREY = {0x99, 0x99, 0x99, 255}; // COLOR_GRAY, the hint grey
 static const SDL_Color C_DOT = {0x55, 0x55, 0x55, 255};	 // the strip's middle dot
-#define LIT_DIM_ALPHA 140								 // the lit card's secondary text: its ink at 140/255 over the accent (black on white = 0x73)
 
 // A card's ground and ink: black / white plain, the accent / its ink lit (selected), opaque (only the List pill wears
 // Color 1's opacity).
@@ -87,17 +85,6 @@ static SDL_Color cardBg(bool lit) {
 }
 static SDL_Color cardInk(bool lit) {
 	return lit ? opaque(UI_onAccent()) : C_WHITE;
-}
-// Secondary text: grey plain; lit, the ink mixed over the accent at LIT_DIM_ALPHA, as one opaque colour so the
-// default theme draws exactly the old 0x73 grey: (0 * 140 + 255 * 115 + 127) / 255 = 115.
-static SDL_Color cardDim(bool lit) {
-	if (!lit)
-		return C_GREY;
-	SDL_Color bg = cardBg(true), ink = cardInk(true);
-	const int a = LIT_DIM_ALPHA;
-	return (SDL_Color){(Uint8)((ink.r * a + bg.r * (255 - a) + 127) / 255),
-					   (Uint8)((ink.g * a + bg.g * (255 - a) + 127) / 255),
-					   (Uint8)((ink.b * a + bg.b * (255 - a) + 127) / 255), 255};
 }
 // An icon or mark lit: tinted to the ink (black at the default theme), its alpha unchanged.
 static void tintLit(SDL_Surface* art) {
@@ -146,9 +133,24 @@ static void cardCacheClear(void);
 ///////////////////////////////////////
 // Units and timing
 
-// Screen px per Brick px: the Brick draws at 3x, the Smart Pro S at 2x.
+// Home's scale: always the Small one (2x), whatever the UI scale (which sizes the lists, not Home).
+static int homeScale(void) {
+	return 2;
+}
+
+// An sp for UIFont_get / Tiles_fitWordsSp / NX_SP (which scale by FIXED_SCALE) that comes out at Home's scale.
+static float homeSp(float sp) {
+	return sp * homeScale() / FIXED_SCALE;
+}
+
+// NX_DP at Home's scale.
+static int homeDp(float dp) {
+	return (int)(dp * homeScale() * 30.0f / 42.0f + 0.5f);
+}
+
+// Screen px per Brick px: Home draws at 2x on every device.
 static float unitPx(void) {
-	return FIXED_SCALE / 3.0f;
+	return homeScale() / 3.0f;
 }
 
 static int px(float bpx) {
@@ -157,7 +159,7 @@ static int px(float bpx) {
 
 // The stats strip keeps the Large scale's size whatever the UI scale: its Brick px at 1:1 (× this in px()).
 static float stripK(void) {
-	return 3.0f / FIXED_SCALE;
+	return 3.0f / homeScale();
 }
 
 static float currentScroll(void) {
@@ -440,8 +442,6 @@ static Entry* tileEntry(const HomeTile* t) {
 		return t->ref >= 0 && t->ref < ngames ? games[t->ref] : NULL;
 	case HOME_TILE_TOOL:
 		return t->ref >= 0 && t->ref < ntools ? tools[t->ref] : NULL;
-	case HOME_TILE_MORE:
-		return NULL;
 	}
 	return NULL;
 }
@@ -516,7 +516,7 @@ static void rebuild(void) {
 	built_root = ((Directory*)stack->items[0])->serial;
 	built_w = screen->w;
 	built_h = screen->h;
-	built_scale = FIXED_SCALE;
+	built_scale = homeScale();
 
 	if (cont)
 		Entry_free(cont);
@@ -560,7 +560,7 @@ static void ensureBuilt(void) {
 	// Home's own inputs only: a reset, the root list (the pins are borrowed from it) and the screen. Not the tab
 	// generation: stepping tabs alone changes nothing Home shows.
 	if (need_rebuild || built_root != ((Directory*)stack->items[0])->serial || built_w != screen->w ||
-		built_h != screen->h || built_scale != FIXED_SCALE) {
+		built_h != screen->h || built_scale != homeScale()) {
 		rebuild();
 		return;
 	}
@@ -720,19 +720,19 @@ static void composePick(SDL_Surface* s, int w, int h) {
 	}
 	// heights first, then each font fetched again right before it draws (a font is only good until the next
 	// UIFont_get)
-	TTF_Font* big = UIFont_get(24, false);
+	TTF_Font* big = UIFont_get(homeSp(24), false);
 	int big_h = big ? TTF_FontHeight(big) : 0;
-	TTF_Font* small = UIFont_get(14, false);
+	TTF_Font* small = UIFont_get(homeSp(14), false);
 	int small_h = small ? TTF_FontHeight(small) : 0;
 	if (big_h > 0 && small_h > 0) {
 		const char* title = "Pick a game";
 		const char* sub = "Nothing played yet";
-		int gap = NX_DPF(4);
+		int gap = homeDp(4);
 		int y = (h - (big_h + gap + small_h)) / 2;
-		big = UIFont_get(24, false);
+		big = UIFont_get(homeSp(24), false);
 		drawText(s, big, title, C_WHITE, (w - textW(big, title)) / 2, y, 255);
 		y += big_h + gap;
-		small = UIFont_get(14, false);
+		small = UIFont_get(homeSp(14), false);
 		drawText(s, small, sub, C_GREY, (w - textW(small, sub)) / 2, y, 255);
 	}
 	tileBorder(s, w, h);
@@ -766,7 +766,7 @@ static void composeGame(SDL_Surface* s, int w, int h, bool lit, int g) {
 	}
 	if (title_tile) {
 		// the name above the caption, centred; 15 sp, smaller (to 11) until its longest word fits
-		float sp = Tiles_fitWordsSp(View_displayName(e), 15, 11, false, w - 2 * side);
+		float sp = Tiles_fitWordsSp(View_displayName(e), homeSp(15), homeSp(11), false, w - 2 * side);
 		TTF_Font* f = UIFont_get(sp, false);
 		if (f) {
 			int caption = lit && when[0] ? h - info_top : 0;
@@ -811,20 +811,6 @@ static void composeTool(SDL_Surface* s, int w, int h, bool lit, int t) {
 			tintLit(icon);
 		SDL_BlitSurface(icon, NULL, s, &(SDL_Rect){(w - icon->w) / 2, (h - icon->h) / 2});
 		SDL_SetSurfaceColorMod(icon, 255, 255, 255);
-	}
-	if (!lit)
-		tileBorder(s, w, h);
-}
-
-// "+N": the tools past the squares (A opens the Tools tab), 30 px grey; lit, the ink dimmed over the accent.
-static void composeMore(SDL_Surface* s, int w, int h, bool lit, int n) {
-	SDL_Color bg = cardBg(lit);
-	SDL_FillRect(s, &(SDL_Rect){0, 0, w, h}, SDL_MapRGBA(s->format, bg.r, bg.g, bg.b, 255));
-	TTF_Font* f = UIFont_getPx(px(MORE_PX), false);
-	if (f) {
-		char text[16];
-		snprintf(text, sizeof(text), "+%d", n);
-		drawText(s, f, text, cardDim(lit), (w - textW(f, text)) / 2, (h - TTF_FontHeight(f)) / 2, 255);
 	}
 	if (!lit)
 		tileBorder(s, w, h);
@@ -876,7 +862,7 @@ static void drawStrip(SDL_Surface* dst, const HomeStats* st, int scroll_px) {
 	Uint32 key = 2166136261u;
 	key = View_fnv(key, &dst->w, sizeof(dst->w));
 	key = View_fnv(key, &layout.strip_lines, sizeof(layout.strip_lines));
-	int scale = FIXED_SCALE;
+	int scale = homeScale();
 	key = View_fnv(key, &scale, sizeof(scale));
 	for (int i = 0; i < l1.n; i++)
 		key = View_fnvStr(key, l1.runs[i].text);
@@ -912,8 +898,7 @@ static void drawStrip(SDL_Surface* dst, const HomeStats* st, int scroll_px) {
 typedef enum { CARD_CONTINUE,
 			   CARD_PICK,
 			   CARD_GAME,
-			   CARD_TOOL,
-			   CARD_MORE } CardKind;
+			   CARD_TOOL } CardKind;
 
 // A tile's identity across frames (the selection crossfade): a top tile by its index, a row pin past them.
 static int tileId(HomeFocus f) {
@@ -979,7 +964,7 @@ static Uint32 artStamp(Uint32 h, HomeArtState st, SDL_Surface* pic, unsigned gen
 }
 // A stamp of the data a card's composition reads (the same lookups compose does, all cached and cheap). The cache
 // outlives rebuilds (and so Home visits), so this must cover every input compose reads beyond the slot's key (kind, ref,
-// w, h, FIXED_SCALE, lit).
+// w, h, homeScale(), lit).
 static Uint32 cardStamp(CardKind kind, int ref, int w, int h, bool lit) {
 	Uint32 hs = 2166136261u;
 	SDL_Surface* pic = NULL;
@@ -1022,8 +1007,6 @@ static Uint32 cardStamp(CardKind kind, int ref, int w, int h, bool lit) {
 		hs = fnvStr(hs, View_displayName(tools[ref]));
 		hs = View_fnv(hs, &layout.glyph, sizeof(layout.glyph));
 		break;
-	case CARD_MORE:
-		break;
 	}
 	return hs;
 }
@@ -1042,9 +1025,6 @@ static void composeCardKind(SDL_Surface* s, CardKind kind, int w, int h, bool li
 		break;
 	case CARD_TOOL:
 		composeTool(s, w, h, lit, ref);
-		break;
-	case CARD_MORE:
-		composeMore(s, w, h, lit, ref);
 		break;
 	}
 	maskCorners(s, w, h, radiusPx());
@@ -1068,7 +1048,7 @@ static SDL_Surface* cachedCard(CardKind kind, int ref, int w, int h, bool lit) {
 			continue;
 		}
 		used++;
-		if (c->kind == kind && c->ref == ref && c->w == w && c->h == h && c->scale == FIXED_SCALE && c->lit == lit) {
+		if (c->kind == kind && c->ref == ref && c->w == w && c->h == h && c->scale == homeScale() && c->lit == lit) {
 			if (c->stamp != stamp) { // same card, new content: recompose in place
 				c->stamp = stamp;
 				composeCardKind(c->surf, kind, w, h, lit, ref);
@@ -1099,7 +1079,7 @@ static SDL_Surface* cachedCard(CardKind kind, int ref, int w, int h, bool lit) {
 		return NULL;
 	}
 	SDL_Surface* surf = victim->surf;
-	*victim = (CardSlot){.used = true, .kind = kind, .ref = ref, .w = w, .h = h, .scale = FIXED_SCALE, .lit = lit, .stamp = stamp, .lru = ++card_lru, .surf = surf};
+	*victim = (CardSlot){.used = true, .kind = kind, .ref = ref, .w = w, .h = h, .scale = homeScale(), .lit = lit, .stamp = stamp, .lru = ++card_lru, .surf = surf};
 	composeCardKind(surf, kind, w, h, lit, ref);
 	return surf;
 }
@@ -1146,14 +1126,12 @@ static CardKind cardKind(const HomeTile* t) {
 		return CARD_GAME;
 	case HOME_TILE_TOOL:
 		return CARD_TOOL;
-	case HOME_TILE_MORE:
-		return CARD_MORE;
 	}
 	return CARD_PICK;
 }
 
 // dst's clip rect is the page band: a tile wholly outside it costs nothing. A lit game (Continue, a pin) and Pick a
-// game wear the 6 px ring outside it; a lit tool square (and "+N") its filled look instead.
+// game wear the 6 px ring outside it; a lit tool square its filled look instead.
 static void drawTile(SDL_Surface* dst, const HomeTile* t, int id, int scroll_px) {
 	SDL_Rect r = toScreen(t->r, scroll_px);
 	int ring = px(HOME_RING);
@@ -1186,11 +1164,6 @@ static void renderHints(SDL_Surface* dst) {
 	if (MenuTabs_focused()) {  // the tab row has focus: exactly SELECT RECENT and A OPEN (A returns to Home)
 		pairs[p++] = "A";
 		pairs[p++] = "OPEN";
-	} else if (t && t->kind == HOME_TILE_MORE) { // "+N": A opens the Tools tab
-		if (MenuTabs_isVisible(MENU_TAB_TOOLS)) {
-			pairs[p++] = "A";
-			pairs[p++] = "OPEN";
-		}
 	} else if (!e) { // Pick a game: A opens the Consoles tab, when there is one
 		if (MenuTabs_isVisible(MENU_TAB_CONSOLES)) {
 			pairs[p++] = "A";
@@ -1265,7 +1238,7 @@ void Home_render(SDL_Surface* dst, int lastScreen) {
 		ContentDim_end(dst);
 		// scrolled: the top band's part below the tab strip goes over the page (nextui.c drew the strip's part)
 		if (scroll_px > 0) {
-			int fade_h = bar_h + NX_DP(48);
+			int fade_h = bar_h + homeDp(48);
 			SDL_Surface* fade = UI_easedFadeSurface(dst->w, fade_h, 0.9f, 3.5f, true);
 			if (fade)
 				UI_blitFade(fade, &(SDL_Rect){0, bar_h, dst->w, fade_h - bar_h}, dst, 0, bar_h);
@@ -1332,10 +1305,6 @@ static void activate(bool* dirty) {
 		else
 			GameList_openTab(MENU_TAB_CONSOLES, dirty); // Pick a game
 		break;
-	case HOME_TILE_MORE: // every tool is listed in the Tools tab
-		if (MenuTabs_isVisible(MENU_TAB_TOOLS))
-			GameList_openTab(MENU_TAB_TOOLS, dirty);
-		break;
 	case HOME_TILE_TOOL:
 		if (e && GameList_settingsPinAllows(e)) { // simple mode's Settings PIN
 			MenuTabs_markHomeLaunch();
@@ -1381,7 +1350,7 @@ bool Home_handleInput(unsigned long now, bool* dirty) {
 			GameList_openContextMenuFor(e, t->kind != HOME_TILE_CONTINUE, t->kind == HOME_TILE_CONTINUE);
 			*dirty = true;
 		}
-		return true; // nothing for Pick a game or "+N"
+		return true; // nothing for Pick a game
 	}
 
 	static const struct {

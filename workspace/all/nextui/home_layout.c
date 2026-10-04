@@ -29,6 +29,25 @@ static void addRows(HomeLayout* l, float y, float pw, int first, int ngames) {
 	}
 }
 
+// The tool squares, sq a side: `rows` tall from y0 (vgap apart down, HOME_GAP across), the block's left edge at bx, in
+// cols columns, filled a column at a time (col_first) or in reading order. Tools past the slots are left off: Pin Tool
+// keeps within them (shortcuts.h, MAX_PINNED_TOOLS). Into out[] (n of them).
+static void placeTools(HomeLayout* l, HomeTile* out, int* n, float bx, float y0, float sq, float vgap, int rows, int cols,
+					   bool col_first, int ntools) {
+	int slots = rows * cols, shown = ntools < slots ? ntools : slots;
+	for (int i = 0; i < shown && *n < HOME_MAX_TOP; i++) {
+		int c = col_first ? i / rows : i % cols, r = col_first ? i % rows : i / cols;
+		out[(*n)++] = (HomeTile){HOME_TILE_TOOL, i, rect(bx + (float)c * (sq + HOME_GAP), y0 + (float)r * (sq + vgap), sq, sq)};
+	}
+}
+
+// Columns for ntools in `rows`-tall columns: as many as they fill, 1 to HOME_TOOL_COLS.
+static int toolCols(int ntools, int rows) {
+	int c = (ntools + rows - 1) / rows;
+	return c < 1 ? 1 : c > HOME_TOOL_COLS ? HOME_TOOL_COLS
+										  : c;
+}
+
 void HomeLayout_compute(float W, float H, float bar, int strip_lines, int ngames, int ntools, HomeLayout* out) {
 	HomeLayout_computeStrip(W, H, bar, strip_lines, 1.0f, ngames, ntools, out);
 }
@@ -57,47 +76,65 @@ void HomeLayout_computeStrip(float W, float H, float bar, int strip_lines, float
 																				: 27);
 	l->top_y = y0;
 	l->pin_h = HOME_PIN_H;
+	l->k = l->wide ? 4 : 2;
 	float page_bottom = bottom;
 	// the Small UI scale with tools: the glyph at the Large size, the squares sized from it (the glyph 58% of a side)
 	bool small = strip_k > 1.0f && ntools > 0;
 	float small_glyph = 46 * strip_k, small_sq = roundf(small_glyph / 0.58f);
+	HomeTile tiles[HOME_MAX_TOP]; // the squares, added after Continue (and the game column)
+	int nt = 0;
 
-	if (!l->wide) {
+	if (ngames == 0 || (l->wide && ngames <= HOME_WIDE_COL_GAMES)) {
+		// no pin rows (no games; on a wide screen up to 2): the top section down to the bottom. The tools four rows of
+		// squares filling it, a column per 4, flush right; on a wide screen the games a column three squares wide left of
+		// them, stacked; Continue the rest, from the left edge
+		const int srows = 4;
+		float h = bottom - y0;
+		l->top_h = h;
+		float sq = roundf((h - (srows - 1) * HOME_GAP) / srows), vgap = (h - srows * sq) / (srows - 1);
+		float x = R; // the next column's right edge, right to left
+		if (ntools > 0) {
+			int cols = toolCols(ntools, srows);
+			float bx = R - cols * sq - (cols - 1) * HOME_GAP;
+			l->square = sq;
+			l->glyph = roundf(sq * 0.58f);
+			placeTools(l, tiles, &nt, bx, y0, sq, vgap, srows, cols, true, ntools);
+			x = bx - HOME_GAP;
+		}
+		float gw = 3 * sq + 2 * HOME_GAP;
+		if (ngames > 0)
+			x -= gw;
+		addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, (ngames > 0 ? x - HOME_GAP : x) - L, h));
+		float gh = (h - (ngames - 1) * HOME_GAP) / (ngames > 0 ? ngames : 1);
+		for (int g = 0; g < ngames; g++)
+			addTop(l, HOME_TILE_GAME, g, rect(x, y0 + g * (gh + HOME_GAP), gw, gh));
+	} else if (!l->wide) {
 		// the Brick: one row of two pins over the hint bar (more go below, the page scrolls), the top section down to
-		// 30 above it; no pins: the top section runs on down
-		l->k = 2;
+		// 30 above it
 		float row_y = bottom - HOME_PIN_H;
-		float h = (ngames > 0 ? row_y - HOME_GAP : bottom) - y0;
-		if (small) { // the column of squares (20 Large px apart) sets the top's height; the pin row takes the rest
+		float h = row_y - HOME_GAP - y0;
+		if (small) { // three squares (20 Large px apart) set the top's height; the pin row takes the rest
 			h = 3 * small_sq + 2 * 20 * strip_k;
-			if (ngames > 0) {
-				row_y = y0 + h + HOME_GAP;
-				l->pin_h = bottom - row_y;
-			}
+			row_y = y0 + h + HOME_GAP;
+			l->pin_h = bottom - row_y;
 		}
 		l->top_h = h;
-		// a column of 3 squares flush right: side round((h − 40) / 3), the gaps sharing the rest; more than 3 tools:
-		// the first two and "+N"
+		// columns of 3 squares flush right, a column per 3 tools: side round((h − 40) / 3), the gaps sharing the rest
 		float cont_w = R - L;
 		if (ntools > 0) {
-			float sq = small ? small_sq : roundf((h - 40) / 3), gap = (h - 3 * sq) / 2, x = R - sq;
+			float sq = small ? small_sq : roundf((h - 40) / 3), gap = (h - 3 * sq) / 2;
+			int cols = toolCols(ntools, 3);
+			float bx = R - cols * sq - (cols - 1) * HOME_GAP;
 			l->square = sq;
 			l->glyph = small ? small_glyph : minf(46, roundf(sq * 0.58f));
-			cont_w = x - HOME_GAP - L;
-			addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, cont_w, h));
-			int shown = ntools > 3 ? 2 : ntools;
-			for (int i = 0; i < shown; i++)
-				addTop(l, HOME_TILE_TOOL, i, rect(x, y0 + i * (sq + gap), sq, sq));
-			if (ntools > 3)
-				addTop(l, HOME_TILE_MORE, ntools - 2, rect(x, y0 + 2 * (sq + gap), sq, sq));
-		} else {
-			addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, cont_w, h));
+			cont_w = bx - HOME_GAP - L;
+			placeTools(l, tiles, &nt, bx, y0, sq, gap, 3, cols, true, ntools);
 		}
+		addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, cont_w, h));
 		addRows(l, row_y, (R - L - HOME_GAP) / 2, 0, ngames);
 	} else {
 		// the Smart Pro S: 8 columns; two rows of four 2-column pins over the hint bar, the top section what they leave
 		// (at most 372; a short screen keeps one row)
-		l->k = 4;
 		float col = (R - L - 7 * HOME_GAP) / 8;
 #define SPAN(n) ((n) * col + ((n) - 1) * HOME_GAP)
 		int rows = 2;
@@ -113,35 +150,25 @@ void HomeLayout_computeStrip(float W, float H, float bar, int strip_lines, float
 			l->pin_h = bottom - rows_y;
 		}
 		l->top_h = h;
-		// Continue from the left edge to 30 before the squares (no tools: the full width); the squares flush right in
-		// reading order: up to 4 tools a 2 x 2 block, 5 or more a 3 x 2 block (its third column taken from Continue),
-		// more than 6 tools five and "+N". Every pinned game goes in the rows (docs/home-b2.md: no large first game).
+		// Continue from the left edge to 30 before the squares (no tools: the full width); the squares flush right: at
+		// the Large scale in reading order, up to 4 tools a 2 x 2 block, 5 or 6 a 3 x 2 block (its third column taken
+		// from Continue); at the Small scale three rows, filled a column at a time, a column per 3 tools.
 		float cont_w = R - L;
-		// The Small UI scale: three rows of squares, filled a column at a time (one column for up to 3 tools, two for
-		// up to 6, more: five and "+N").
 		if (ntools > 0) {
 			int srows = small ? 3 : 2;
-			int cols = small ? (ntools <= 3 ? 1 : 2) : (ntools <= 4 ? 2 : 3), slots = srows * cols;
+			int cols = small ? toolCols(ntools, 3) : (ntools <= 4 ? 2 : 3);
 			float sq = small ? small_sq : (h - HOME_GAP) / 2, bx = R - cols * sq - (cols - 1) * HOME_GAP;
 			l->square = sq;
 			l->glyph = small ? small_glyph : minf(46, roundf(sq * 0.58f));
 			cont_w = bx - HOME_GAP - L;
-			addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, cont_w, h));
-			int shown = ntools > slots ? slots - 1 : ntools;
-			for (int i = 0; i <= shown && i < slots; i++) {
-				int c = small ? i / srows : i % cols, rr = small ? i % srows : i / cols;
-				HomeRect r = rect(bx + (float)c * (sq + HOME_GAP), y0 + (float)rr * (sq + HOME_GAP), sq, sq);
-				if (i < shown)
-					addTop(l, HOME_TILE_TOOL, i, r);
-				else if (ntools > slots)
-					addTop(l, HOME_TILE_MORE, ntools - shown, r);
-			}
-		} else {
-			addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, cont_w, h));
+			placeTools(l, tiles, &nt, bx, y0, sq, HOME_GAP, srows, cols, small, ntools);
 		}
+		addTop(l, HOME_TILE_CONTINUE, 0, rect(L, y0, cont_w, h));
 		addRows(l, rows_y, SPAN(2), 0, ngames);
 #undef SPAN
 	}
+	for (int i = 0; i < nt; i++)
+		addTop(l, tiles[i].kind, tiles[i].ref, tiles[i].r);
 	if (l->npins > 0) {
 		HomeRect last = l->pins[l->npins - 1].r;
 		if (last.y + last.h > page_bottom)

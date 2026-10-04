@@ -145,6 +145,22 @@ int Shortcuts_exists(const char* path) {
 	return ShortcutArray_indexOf(shortcuts, path) != -1;
 }
 
+bool Shortcuts_canAdd(Entry* entry) {
+	if (!shortcuts || !entry || shortcuts->count >= MAX_SHORTCUTS)
+		return false;
+	if (entry->type != ENTRY_PAK)
+		return true;
+	int tools = 0, games = 0;
+	for (int i = 0; i < shortcuts->count; i++) {
+		Shortcut* shortcut = shortcuts->items[i];
+		if (suffixMatch(".pak", shortcut->path))
+			tools++;
+		else
+			games++;
+	}
+	return tools < (games > 0 ? MAX_PINNED_TOOLS : MAX_PINNED_TOOLS_NO_GAMES);
+}
+
 void Shortcuts_add(Entry* entry) {
 	if (!shortcuts || !entry)
 		return;
@@ -155,9 +171,9 @@ void Shortcuts_add(Entry* entry) {
 	if (Shortcuts_exists(path))
 		return;
 
-	if (shortcuts->count >= MAX_SHORTCUTS) {
+	if (!Shortcuts_canAdd(entry)) {
 		// refuse rather than silently evict a pin the user placed
-		LOG_warn("Shortcuts_add: limit of %d reached, not adding %s\n", MAX_SHORTCUTS, path);
+		LOG_warn("Shortcuts_add: pin limit reached, not adding %s\n", path);
 		return;
 	}
 	Array_push(shortcuts, Shortcut_new(path, entry->name)); // appended: pins keep the order they were added

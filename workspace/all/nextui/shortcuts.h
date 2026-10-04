@@ -5,6 +5,10 @@
 #include <stdbool.h>
 
 #define MAX_SHORTCUTS 12
+// Pinned tools at most, so Home shows every one: 9 while a game is pinned (three columns of 3 squares), 8 with none (two
+// columns of 4)
+#define MAX_PINNED_TOOLS 9
+#define MAX_PINNED_TOOLS_NO_GAMES 8
 
 // Initialize shortcuts (call in Menu_init)
 void Shortcuts_init(void);
@@ -15,7 +19,10 @@ void Shortcuts_quit(void);
 // Check if a shortcut exists for the given path (without SDCARD_PATH prefix)
 int Shortcuts_exists(const char* path);
 
-// Add a shortcut for the given entry
+// Whether the entry can be pinned now: fewer than MAX_SHORTCUTS pins and, for a tool, fewer tools than the tool cap
+bool Shortcuts_canAdd(Entry* entry);
+
+// Add a shortcut for the given entry (refused when Shortcuts_canAdd says no)
 void Shortcuts_add(Entry* entry);
 
 // Remove a shortcut for the given entry

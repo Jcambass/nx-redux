@@ -1454,7 +1454,7 @@ static void romItems(Entry* entry, bool allow_pin, ContextMenuItem* items, int* 
 	if (allow_pin && canPinEntry(entry)) {
 		if (Shortcuts_exists(entry->path + strlen(SDCARD_PATH)))
 			addItem(items, idx, "Unpin Item", 31);
-		else
+		else if (Shortcuts_canAdd(entry))
 			addItem(items, idx, "Pin Item", 30);
 	}
 	char game_file[MAX_PATH];
@@ -1479,7 +1479,7 @@ static void romItems(Entry* entry, bool allow_pin, ContextMenuItem* items, int* 
 static void toolItems(Entry* entry, ContextMenuItem* items, int* idx) {
 	if (Shortcuts_exists(entry->path + strlen(SDCARD_PATH)))
 		addItem(items, idx, "Unpin Tool", 21);
-	else
+	else if (Shortcuts_canAdd(entry)) // full (MAX_SHORTCUTS, or the tool cap): unpin something first
 		addItem(items, idx, "Pin Tool", 20);
 }
 
