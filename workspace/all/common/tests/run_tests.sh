@@ -54,6 +54,8 @@ cc -std=gnu99 -Wall -Werror -fsanitize=address -g -I../ui -o /tmp/nx_test_infoba
 /tmp/nx_test_infoband_layout
 cc -std=gnu99 -Wall -Werror -fsanitize=address -g -o /tmp/nx_test_collcount_model ../../nextui/collcount_model.c test_collcount_model.c
 /tmp/nx_test_collcount_model
+cc -std=gnu99 -Wall -Werror -fsanitize=address -g -o /tmp/nx_test_tabbg_model ../../nextui/tabbg_model.c test_tabbg_model.c
+/tmp/nx_test_tabbg_model
 cc -std=gnu99 -Wall -Werror -fsanitize=address -g -o /tmp/nx_test_collname ../../nextui/collname.c test_collname.c
 /tmp/nx_test_collname
 sh test_launcher_logs_path.sh

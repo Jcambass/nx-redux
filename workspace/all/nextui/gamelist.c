@@ -43,6 +43,7 @@
 #include "controller_art_model.h"
 #include "menulogo.h"
 #include "menutabs.h"
+#include "tabbg_model.h"
 #include "recents.h"
 #include "search.h"
 #include "types.h"
@@ -141,7 +142,9 @@ void GameList_clearScroll(void) {
 	ScrollText_clear(&list_scroll);
 }
 
-static void resolveAndLoadBackground(Entry* entry, const char* rompath,
+// tab_bg: the user's background for the selected main-menu row (tabBackground), shown instead of the global
+// bg.png; NULL for none.
+static void resolveAndLoadBackground(Entry* entry, const char* rompath, const char* tab_bg,
 									 bool* list_show_entry_names) {
 	// Persists across calls to avoid redundant background reloads
 	// (file-scope bgLastType so GameList_invalidateBackground can reset it)
@@ -152,6 +155,8 @@ static void resolveAndLoadBackground(Entry* entry, const char* rompath,
 	// No entry (an empty list, or a main-menu tab without game art) is keyed
 	// as "", which no entry path can be.
 	const char* key = entry ? entry->path : "";
+	if (tab_bg)
+		key = tab_bg;
 	if (bgResolveValid && exactMatch(key, bgResolvePath)) {
 		if (bgResolveForcedNames)
 			*list_show_entry_names = true;
@@ -169,8 +174,11 @@ static void resolveAndLoadBackground(Entry* entry, const char* rompath,
 	const char* cmpPath = NULL;
 	char bgPath[512] = {0};
 
-	if (entry && (entry->type == ENTRY_DIR || entry->type == ENTRY_ROM) &&
-		Shortcuts_exists(entry->path + strlen(SDCARD_PATH))) {
+	if (tab_bg) {
+		cmpPath = tab_bg;
+		strncpy(bgPath, tab_bg, sizeof(bgPath) - 1);
+	} else if (entry && (entry->type == ENTRY_DIR || entry->type == ENTRY_ROM) &&
+			   Shortcuts_exists(entry->path + strlen(SDCARD_PATH))) {
 		cmpPath = entry->path;
 	} else if (entry && entry->type == ENTRY_PAK && suffixMatch(".pak", entry->path)) {
 		cmpPath = entry->path;
@@ -214,6 +222,30 @@ static void resolveAndLoadBackground(Entry* entry, const char* rompath,
 		onBackgroundLoaded(NULL);
 		*list_show_entry_names = true;
 	}
+}
+
+static bool tabBgExists(const char* path) {
+	return exists((char*)path);
+}
+
+// The user's background for the selected row of the Consoles or Collections List tab (tabbg_model.h), or NULL.
+// The answer is kept per row, tab and controller setting: the List redraws every frame of a glide or marquee and
+// this would otherwise stat the SD card each time.
+static const char* tabBackground(MenuTabId tab, const Entry* entry) {
+	static char last_entry[1024], last_bg[1024];
+	static int last_tab = -1, last_art = -1;
+	static bool last_found = false;
+	if (!entry || (tab != MENU_TAB_CONSOLES && tab != MENU_TAB_COLLECTIONS))
+		return NULL;
+	int art = CFG_getMenuControllerArt() ? 1 : 0;
+	if (last_tab != (int)tab || last_art != art || !exactMatch(last_entry, entry->path)) {
+		last_tab = tab;
+		last_art = art;
+		snprintf(last_entry, sizeof(last_entry), "%s", entry->path);
+		last_found = TabBg_path(tab == MENU_TAB_CONSOLES ? TABBG_CONSOLES : TABBG_COLLECTIONS, entry->path, art,
+								tabBgExists, last_bg, sizeof(last_bg));
+	}
+	return last_found ? last_bg : NULL;
 }
 
 ///////////////////////////////////////
@@ -2112,7 +2144,7 @@ void GameList_render(SDL_Surface* screen, int lastScreen,
 	if (Home_active()) {
 		// the global bg.png, as on every main-menu tab, and no thumbnail (Home draws its own pictures)
 		bool names = true;
-		resolveAndLoadBackground(NULL, NULL, &names);
+		resolveAndLoadBackground(NULL, NULL, NULL, &names);
 		had_thumb = false;
 		ox = screen->w;
 		if (!list_art_cleared || lastScreen != SCREEN_GAMELIST) {
@@ -2167,14 +2199,17 @@ void GameList_render(SDL_Surface* screen, int lastScreen,
 
 	bool at_root = stack->count == 1;
 	MenuTabId tab = MenuTabs_current();
-	// Home holds games; Consoles, Collections and Tools draw no game art (spec: no console
-	// background on the main menu, plain lists for Collections and Tools)
+	// Home holds games; Consoles, Collections and Tools draw no game art (only a user's own
+	// .media background, below; plain lists for Collections and Tools)
 	bool game_art = !at_root || tab == MENU_TAB_HOME;
 
 	// load folder background. Every main-menu tab shows the global bg.png (no
 	// entry): pinned shortcuts and tools would otherwise clear it or show a
-	// tool's own background. Game lists keep the per-entry background.
-	resolveAndLoadBackground(at_root ? NULL : entry, rompath, &list_show_entry_names);
+	// tool's own background. Game lists keep the per-entry background. The
+	// Consoles and Collections tabs show the selected row's own .media
+	// background instead when the card has one (tabBackground).
+	resolveAndLoadBackground(at_root ? NULL : entry, rompath, at_root ? tabBackground(tab, entry) : NULL,
+							 &list_show_entry_names);
 
 	// load game thumbnails
 	if (!game_art) {
