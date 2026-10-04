@@ -24,6 +24,14 @@ if [ -n "$MIN_FW" ] && [ -n "$FW" ] && [ "$FW" != "$MIN_FW" ]; then
 fi
 
 # --------------------------------------
+# A failed or interrupted in-app update download used to leave a truncated
+# .tmp_update.zip in the card root (the updater kept the partial file).
+# Windows Explorer opens the root when the card is plugged in and asks for
+# "the last disk of the multi-volume set" on that broken zip. A successful
+# OTA deletes it before rebooting, so anything left here is stale.
+rm -f "$SDCARD_PATH/.tmp_update.zip" "$SDCARD_PATH/.tmp_update.zip.done" "$SDCARD_PATH/.tmp_update.zip.headers" 2>/dev/null
+
+# --------------------------------------
 # --- psp-standalone-cleanup-begin
 # PSP moved from the standalone PPSSPP pak (ben16w/minui-psp, installed from
 # Xtras into Emus/<platform>/PSP.pak, earlier the flat Emus/PSP.pak) to the

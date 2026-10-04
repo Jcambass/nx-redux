@@ -365,6 +365,9 @@ static void* extract_thread(void* arg) {
 
 	int ret = run_command(argv);
 	if (ret != 0) {
+		// Don't leave the zip in the card root: a retry downloads it again,
+		// and Windows Explorer prompts for a "multi-volume set" on a bad zip.
+		unlink(DOWNLOAD_PATH);
 		snprintf(ctx->error, sizeof(ctx->error), "Extraction failed");
 		ctx->success = 0;
 		__sync_synchronize();
@@ -770,6 +773,11 @@ static void do_install(SDL_Surface* screen, ReleaseInfo* release) {
 	}
 
 	if (!dl_success) {
+		// wget_download_file keeps partial files for resume, but the updater
+		// never resumes (it unlinks before each download). A truncated zip
+		// left in the card root makes Windows Explorer prompt for "the last
+		// disk of the multi-volume set" whenever the card is plugged in.
+		unlink(DOWNLOAD_PATH);
 		PWR_enableSleep();
 		PWR_enableAutosleep();
 		show_message_page(screen, "Update Error", "Download failed");
