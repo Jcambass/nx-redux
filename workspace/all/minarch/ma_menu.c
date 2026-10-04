@@ -1229,7 +1229,8 @@ void Menu_updateState(void) {
 }
 
 typedef struct {
-	char* pixels;
+	char* pixels;		  // raw GL capture (ABGR8888), or NULL when surface is set
+	SDL_Surface* surface; // ready-to-save surface the worker owns, or NULL
 	char* path;
 	int w;
 	int h;
@@ -1248,7 +1249,8 @@ static SDL_Surface* rawCaptureToSurface(unsigned char* pixels, int w, int h, Uin
 int save_screenshot_thread(void* data) {
 	PWR_pinHelperThread(); // minarch_cpu_affinity=big -> SLOW set (no-op otherwise)
 	SaveImageArgs* args = (SaveImageArgs*)data;
-	SDL_Surface* converted = rawCaptureToSurface(args->pixels, args->w, args->h, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface* converted = args->surface ? args->surface
+										   : rawCaptureToSurface(args->pixels, args->w, args->h, SDL_PIXELFORMAT_ARGB8888);
 
 	if (!converted) {
 		SDL_Log("Failed to convert screenshot surface: %s", SDL_GetError());
@@ -1291,11 +1293,36 @@ void Menu_queueScreenshotSave(const char* png_path) {
 	}
 	SaveImageArgs* args = malloc(sizeof(SaveImageArgs));
 	args->pixels = pixels;
+	args->surface = NULL;
 	args->w = cw;
 	args->h = ch;
 	args->path = SDL_strdup(png_path);
-	SDL_WaitThread(screenshotsavethread, NULL);
+	Menu_waitScreenshotSave();
 	screenshotsavethread = SDL_CreateThread(save_screenshot_thread, "SaveScreenshotThread", args);
+}
+// Hands a copy of `surface` to the background PNG-save worker at `png_path`.
+// The in-game menu runs at a capped CPU clock, and a shader's scanlines or
+// LCD grid leave no flat runs for the encoder, so saving the full-screen slot
+// preview inline stalled Save for several seconds with a shader on.
+static void Menu_queueSurfaceSave(SDL_Surface* surface, const char* png_path) {
+	SDL_Surface* copy = SDL_ConvertSurface(surface, surface->format, 0);
+	if (!copy) {
+		SDL_Log("Failed to copy screenshot surface: %s", SDL_GetError());
+		return;
+	}
+	SaveImageArgs* args = malloc(sizeof(SaveImageArgs));
+	args->pixels = NULL;
+	args->surface = copy;
+	args->w = copy->w;
+	args->h = copy->h;
+	args->path = SDL_strdup(png_path);
+	Menu_waitScreenshotSave();
+	screenshotsavethread = SDL_CreateThread(save_screenshot_thread, "SaveScreenshotThread", args);
+}
+// Blocks until a queued PNG save has finished writing, so its file can be read.
+void Menu_waitScreenshotSave(void) {
+	SDL_WaitThread(screenshotsavethread, NULL);
+	screenshotsavethread = NULL;
 }
 void Menu_screenshot(void) {
 	char rom_name[MAX_PATH]; // getDisplayName/getAlias can write up to MAX_PATH
@@ -1374,9 +1401,7 @@ void Menu_saveState(void) {
 		Menu_queueScreenshotSave(menu.bmp_path);
 		newScreenshot = 0;
 	} else if (menu.bitmap) {
-		SDL_RWops* rw = SDL_RWFromFile(menu.bmp_path, "wb");
-		if (rw)
-			IMG_SavePNG_RW(menu.bitmap, rw, 1);
+		Menu_queueSurfaceSave(menu.bitmap, menu.bmp_path);
 	}
 
 	state_slot = menu.slot;
@@ -1529,6 +1554,8 @@ void Menu_netplayNotice(const char* title, const char* subtitle, int hold_ms) {
 }
 
 void Menu_loop(void) {
+	// the slot previews below are read back from disk
+	Menu_waitScreenshotSave();
 	menu.bitmap = Menu_captureScreenSurface(SDL_PIXELFORMAT_ARGB8888);
 	SDL_Surface* backing = SDL_CreateRGBSurfaceWithFormat(0, DEVICE_WIDTH, DEVICE_HEIGHT, 32, SDL_PIXELFORMAT_ARGB8888);
 

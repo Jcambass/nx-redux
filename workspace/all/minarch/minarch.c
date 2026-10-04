@@ -555,7 +555,7 @@ finish:
 	//SND_quit();
 	PAD_quit();
 	GFX_quit();
-	SDL_WaitThread(screenshotsavethread, NULL);
+	Menu_waitScreenshotSave();
 	// Last: QuitSettings() munmaps the libmsettings shared memory. It used to run
 	// right after Notification_quit(), while the VIB_thread (stopped only by
 	// VIB_quit() above) could still be polling GetRumble() for an active burst;
