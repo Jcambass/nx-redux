@@ -595,6 +595,17 @@ static void reset_show_search_hint(void) {
 	CFG_setShowSearchHint(CFG_DEFAULT_SHOWSEARCHHINT);
 }
 
+/* Show recent hint */
+static int get_show_recent_hint(void) {
+	return CFG_getShowRecentHint() ? 1 : 0;
+}
+static void set_show_recent_hint(int v) {
+	CFG_setShowRecentHint(v != 0);
+}
+static void reset_show_recent_hint(void) {
+	CFG_setShowRecentHint(CFG_DEFAULT_SHOWRECENTHINT);
+}
+
 /* Show menu animations */
 static int get_menu_animations(void) {
 	return CFG_getMenuAnimations() ? 1 : 0;
@@ -734,6 +745,17 @@ static void reset_show_tools(void) {
 	CFG_setShowTools(CFG_DEFAULT_SHOWTOOLS);
 }
 
+/* Show Home */
+static int get_show_home(void) {
+	return CFG_getShowHome() ? 1 : 0;
+}
+static void set_show_home(int v) {
+	CFG_setShowHome(v != 0);
+}
+static void reset_show_home(void) {
+	CFG_setShowHome(CFG_DEFAULT_SHOWHOME);
+}
+
 /* Controller art */
 static int get_menu_controller_art(void) {
 	return CFG_getMenuControllerArt() ? 1 : 0;
@@ -743,6 +765,28 @@ static void set_menu_controller_art(int v) {
 }
 static void reset_menu_controller_art(void) {
 	CFG_setMenuControllerArt(CFG_DEFAULT_MENUCONTROLLERART);
+}
+
+/* Page title */
+static int get_page_title(void) {
+	return CFG_getPageTitle() ? 1 : 0;
+}
+static void set_page_title(int v) {
+	CFG_setPageTitle(v != 0);
+}
+static void reset_page_title(void) {
+	CFG_setPageTitle(CFG_DEFAULT_PAGETITLE);
+}
+
+/* Button hints */
+static int get_button_hints(void) {
+	return CFG_getButtonHints() ? 1 : 0;
+}
+static void set_button_hints(int v) {
+	CFG_setButtonHints(v != 0);
+}
+static void reset_button_hints(void) {
+	CFG_setButtonHints(CFG_DEFAULT_BUTTONHINTS);
 }
 
 /* Show collection */
@@ -1354,7 +1398,7 @@ static void init_about_info(void) {
 // ============================================
 
 #define MAX_APPEARANCE_ITEMS 28
-#define MAX_LAYOUTS_ITEMS 16
+#define MAX_LAYOUTS_ITEMS 20
 #define MAX_DISPLAY_ITEMS 8
 #define MAX_SYSTEM_ITEMS 24
 #define MAX_FN_ITEMS 20
@@ -1362,7 +1406,7 @@ static void init_about_info(void) {
 #define MAX_NOTIFY_ITEMS 8
 #define MAX_ABOUT_ITEMS 8
 #define MAX_SIMPLE_MODE_ITEMS 2
-#define MAX_MAIN_ITEMS 15
+#define MAX_MAIN_ITEMS 16
 
 static SettingItem appearance_items[MAX_APPEARANCE_ITEMS];
 static SettingItem layouts_items[MAX_LAYOUTS_ITEMS];
@@ -1615,7 +1659,6 @@ static void reset_layouts_items(void) {
 }
 static void reset_appearance_page(void) {
 	settings_page_reset_all(&appearance_page);
-	reset_layouts_items(); // reset does not recurse into submenus
 }
 static void reset_layouts_page(void) {
 	reset_layouts_items();
@@ -1706,7 +1749,7 @@ static void build_menu_tree(const DeviceInfo* dev) {
 	int idx;
 
 	// ============================
-	// Layouts page (Appearance submenu)
+	// Layouts page (main page category)
 	// ============================
 	idx = 0;
 	// Each "<tab> orientation" row sits directly under its style row (sync_layouts_orient_rows shows it)
@@ -1750,6 +1793,9 @@ static void build_menu_tree(const DeviceInfo* dev) {
 	layouts_items[idx++].a_cycles = 1;
 	sync_layouts_orient_rows();
 	layouts_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
+		"Home tab", "Show the Home tab. It still shows when no other tab does.",
+		hide_show_labels, 2, on_off_values, get_show_home, set_show_home, reset_show_home);
+	layouts_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
 		"Consoles tab", "Show the Consoles tab.",
 		hide_show_labels, 2, on_off_values, get_show_emulators, set_show_emulators, reset_show_emulators);
 	layouts_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
@@ -1762,6 +1808,14 @@ static void build_menu_tree(const DeviceInfo* dev) {
 		"Controller", "Show each console's controller behind it in the Consoles tab.",
 		hide_show_labels, 2, on_off_values, get_menu_controller_art, set_menu_controller_art, reset_menu_controller_art);
 	layouts_items[idx - 1].a_cycles = 1; // A flips it too, as LEFT and RIGHT
+	layouts_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
+		"Page title", "The tabs and a game list's title. Hidden, L1/R1 still switch tabs.",
+		hide_show_labels, 2, on_off_values, get_page_title, set_page_title, reset_page_title);
+	layouts_items[idx - 1].a_cycles = 1;
+	layouts_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
+		"Button hints", "Hidden, List game lists show play time and achievements.",
+		hide_show_labels, 2, on_off_values, get_button_hints, set_button_hints, reset_button_hints);
+	layouts_items[idx - 1].a_cycles = 1;
 	layouts_items[idx++] = (SettingItem)ITEM_BUTTON_INIT(
 		"Reset to defaults", "Resets all options in this menu to their default values.",
 		reset_layouts_page);
@@ -1777,8 +1831,6 @@ static void build_menu_tree(const DeviceInfo* dev) {
 	appearance_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
 		"UI scale", "Size of text and menus. Larger scales show fewer rows.",
 		ui_scale_labels, 3, ui_scale_values, get_ui_scale, set_ui_scale, reset_ui_scale);
-	appearance_items[idx++] = (SettingItem)ITEM_SUBMENU_INIT(
-		"Layouts", "Main menu tab styles and which tabs show.", &layouts_page);
 	appearance_items[idx++] = (SettingItem)ITEM_COLOR_INIT(
 		"Main color", "The color used to render main UI elements.",
 		color_labels, COLOR_COUNT, (int*)color_values, get_color1, set_color1, reset_color1);
@@ -1812,6 +1864,9 @@ static void build_menu_tree(const DeviceInfo* dev) {
 	appearance_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
 		"Show search hint", "Show the START search button hint on the main menu",
 		on_off_labels, 2, on_off_values, get_show_search_hint, set_show_search_hint, reset_show_search_hint);
+	appearance_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
+		"Show recent hint", "Show the SELECT recent games button hint on the main menu",
+		on_off_labels, 2, on_off_values, get_show_recent_hint, set_show_recent_hint, reset_show_recent_hint);
 	appearance_items[idx++] = (SettingItem)ITEM_CYCLE_INIT(
 		"Show menu animations", "Enable or disable menu animations",
 		on_off_labels, 2, on_off_values, get_menu_animations, set_menu_animations, reset_menu_animations);
@@ -2109,6 +2164,8 @@ static void build_menu_tree(const DeviceInfo* dev) {
 	}
 	main_items[idx++] = (SettingItem)ITEM_SUBMENU_INIT(
 		"Appearance", "UI customization", &appearance_page);
+	main_items[idx++] = (SettingItem)ITEM_SUBMENU_INIT(
+		"Layouts", "Menu styles, tabs and button hints", &layouts_page);
 	main_items[idx++] = (SettingItem)ITEM_SUBMENU_INIT(
 		"In-game Notifications", "Save state notifications", &notify_page);
 

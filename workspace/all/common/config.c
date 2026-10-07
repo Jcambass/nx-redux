@@ -61,11 +61,15 @@ void CFG_defaults(NextUISettings* cfg) {
 		.clock24h = CFG_DEFAULT_CLOCK24H,
 		.showBatteryPercent = CFG_DEFAULT_SHOWBATTERYPERCENT,
 		.showSearchHint = CFG_DEFAULT_SHOWSEARCHHINT,
+		.showRecentHint = CFG_DEFAULT_SHOWRECENTHINT,
 		.showMenuAnimations = CFG_DEFAULT_SHOWMENUANIMATIONS,
 		.showMenuTransitions = CFG_DEFAULT_SHOWMENUTRANSITIONS,
 		.showRecents = CFG_DEFAULT_SHOWRECENTS,
 		.showTools = CFG_DEFAULT_SHOWTOOLS,
+		.showHome = CFG_DEFAULT_SHOWHOME,
 		.menuControllerArt = CFG_DEFAULT_MENUCONTROLLERART,
+		.buttonHints = CFG_DEFAULT_BUTTONHINTS,
+		.pageTitle = CFG_DEFAULT_PAGETITLE,
 		.showCollections = CFG_DEFAULT_SHOWCOLLECTIONS,
 		.showEmulators = CFG_DEFAULT_SHOWEMULATORS,
 		.gameSwitcherScaling = CFG_DEFAULT_GAMESWITCHERSCALING,
@@ -164,6 +168,10 @@ void CFG_init(FontLoad_callback_t cb, ColorSet_callback_t ccb) {
 				CFG_setShowSearchHint((bool)temp_value);
 				continue;
 			}
+			if (sscanf(line, "recenthint=%i", &temp_value) == 1) {
+				CFG_setShowRecentHint((bool)temp_value);
+				continue;
+			}
 			if (sscanf(line, "menuanim=%i", &temp_value) == 1) {
 				CFG_setMenuAnimations((bool)temp_value);
 				continue;
@@ -180,8 +188,20 @@ void CFG_init(FontLoad_callback_t cb, ColorSet_callback_t ccb) {
 				CFG_setShowTools((bool)temp_value);
 				continue;
 			}
+			if (sscanf(line, "showhome=%i", &temp_value) == 1) {
+				CFG_setShowHome((bool)temp_value);
+				continue;
+			}
 			if (sscanf(line, "menucontrollerart=%i", &temp_value) == 1) {
 				CFG_setMenuControllerArt((bool)temp_value);
+				continue;
+			}
+			if (sscanf(line, "buttonhints=%i", &temp_value) == 1) {
+				CFG_setButtonHints((bool)temp_value);
+				continue;
+			}
+			if (sscanf(line, "pagetitle=%i", &temp_value) == 1) {
+				CFG_setPageTitle((bool)temp_value);
 				continue;
 			}
 			if (sscanf(line, "collections=%i", &temp_value) == 1) {
@@ -594,6 +614,15 @@ void CFG_setShowSearchHint(bool show) {
 	CFG_sync();
 }
 
+bool CFG_getShowRecentHint(void) {
+	return settings.showRecentHint;
+}
+
+void CFG_setShowRecentHint(bool show) {
+	settings.showRecentHint = show;
+	CFG_sync();
+}
+
 bool CFG_getMenuAnimations(void) {
 	return settings.showMenuAnimations;
 }
@@ -630,12 +659,39 @@ void CFG_setShowTools(bool show) {
 	CFG_sync();
 }
 
+bool CFG_getShowHome(void) {
+	return settings.showHome;
+}
+
+void CFG_setShowHome(bool show) {
+	settings.showHome = show;
+	CFG_sync();
+}
+
 bool CFG_getMenuControllerArt(void) {
 	return settings.menuControllerArt;
 }
 
 void CFG_setMenuControllerArt(bool show) {
 	settings.menuControllerArt = show;
+	CFG_sync();
+}
+
+bool CFG_getButtonHints(void) {
+	return settings.buttonHints;
+}
+
+void CFG_setButtonHints(bool show) {
+	settings.buttonHints = show;
+	CFG_sync();
+}
+
+bool CFG_getPageTitle(void) {
+	return settings.pageTitle;
+}
+
+void CFG_setPageTitle(bool show) {
+	settings.pageTitle = show;
 	CFG_sync();
 }
 
@@ -1153,6 +1209,8 @@ void CFG_get(const char* key, char* value) {
 		sprintf(value, "%i", CFG_getShowBatteryPercent());
 	} else if (strcmp(key, "searchhint") == 0) {
 		sprintf(value, "%i", CFG_getShowSearchHint());
+	} else if (strcmp(key, "recenthint") == 0) {
+		sprintf(value, "%i", CFG_getShowRecentHint());
 	} else if (strcmp(key, "menuanim") == 0) {
 		sprintf(value, "%i", CFG_getMenuAnimations());
 	} else if (strcmp(key, "menutransitions") == 0) {
@@ -1161,8 +1219,14 @@ void CFG_get(const char* key, char* value) {
 		sprintf(value, "%i", CFG_getShowRecents());
 	} else if (strcmp(key, "tools") == 0) {
 		sprintf(value, "%i", CFG_getShowTools());
+	} else if (strcmp(key, "showhome") == 0) {
+		sprintf(value, "%i", CFG_getShowHome());
 	} else if (strcmp(key, "menucontrollerart") == 0) {
 		sprintf(value, "%i", CFG_getMenuControllerArt());
+	} else if (strcmp(key, "buttonhints") == 0) {
+		sprintf(value, "%i", CFG_getButtonHints());
+	} else if (strcmp(key, "pagetitle") == 0) {
+		sprintf(value, "%i", CFG_getPageTitle());
 	} else if (strcmp(key, "collections") == 0) {
 		sprintf(value, "%i", CFG_getShowCollections());
 	} else if (strcmp(key, "emulators") == 0) {
@@ -1260,11 +1324,15 @@ static int CFG_serialize(char* buf, size_t cap) {
 	EMIT("clock24h=%i\n", settings.clock24h);
 	EMIT("batteryperc=%i\n", settings.showBatteryPercent);
 	EMIT("searchhint=%i\n", settings.showSearchHint);
+	EMIT("recenthint=%i\n", settings.showRecentHint);
 	EMIT("menuanim=%i\n", settings.showMenuAnimations);
 	EMIT("menutransitions=%i\n", settings.showMenuTransitions);
 	EMIT("recents=%i\n", settings.showRecents);
 	EMIT("tools=%i\n", settings.showTools);
+	EMIT("showhome=%i\n", settings.showHome);
 	EMIT("menucontrollerart=%i\n", settings.menuControllerArt);
+	EMIT("buttonhints=%i\n", settings.buttonHints);
+	EMIT("pagetitle=%i\n", settings.pageTitle);
 	EMIT("collections=%i\n", settings.showCollections);
 	EMIT("emulators=%i\n", settings.showEmulators);
 	EMIT("showfoldernamesatroot=%i\n", settings.showFolderNamesAtRoot);
@@ -1501,11 +1569,15 @@ void CFG_print(void) {
 	printf("\t\"clock24h\": %i,\n", settings.clock24h);
 	printf("\t\"batteryperc\": %i,\n", settings.showBatteryPercent);
 	printf("\t\"searchhint\": %i,\n", settings.showSearchHint);
+	printf("\t\"recenthint\": %i,\n", settings.showRecentHint);
 	printf("\t\"menuanim\": %i,\n", settings.showMenuAnimations);
 	printf("\t\"menutransitions\": %i,\n", settings.showMenuTransitions);
 	printf("\t\"recents\": %i,\n", settings.showRecents);
 	printf("\t\"tools\": %i,\n", settings.showTools);
+	printf("\t\"showhome\": %i,\n", settings.showHome);
 	printf("\t\"menucontrollerart\": %i,\n", settings.menuControllerArt);
+	printf("\t\"buttonhints\": %i,\n", settings.buttonHints);
+	printf("\t\"pagetitle\": %i,\n", settings.pageTitle);
 	printf("\t\"collections\": %i,\n", settings.showCollections);
 	printf("\t\"showfoldernamesatroot\": %i,\n", settings.showFolderNamesAtRoot);
 	printf("\t\"screentimeout\": %i,\n", settings.screenTimeoutSecs);
