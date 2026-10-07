@@ -252,6 +252,11 @@ the initial Rice port.
 
 ## Build (TG5040)
 
+The shipped binaries are built by `workspace/all/prebuilts/mupen64plus.sh` (both platforms) and
+`workspace/all/prebuilts/gliden64.sh` — run them via `make build-prebuilt` (see `.dev/BUILD.md`);
+those scripts hold the pins (input-sdl and rsp-hle are tag 2.6.0). The manual steps below are
+the recipe they automate.
+
 All builds run inside Docker using `ghcr.io/loveretro/tg5040-toolchain:latest`.
 
 ### 1. mupen64plus-core

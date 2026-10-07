@@ -1271,6 +1271,10 @@ static const char* get_about_os_version(void) {
 static const char* get_about_busybox(void) {
 	return about_busybox_version;
 }
+// MiSans' license requires the software itself to say it uses MiSans
+static const char* get_about_font(void) {
+	return "MiSans by Xiaomi";
+}
 
 static void init_about_info(void) {
 	/* NxRedux version: read from version.txt and format as "tag (name-hash)" */
@@ -2086,6 +2090,8 @@ static void build_menu_tree(const DeviceInfo* dev) {
 		"", get_about_os_version);
 	about_items[idx++] = (SettingItem)ITEM_STATIC_INIT(
 		"Busybox version", "", get_about_busybox);
+	about_items[idx++] = (SettingItem)ITEM_STATIC_INIT(
+		"Font", "Third-party licenses are in .system/licenses", get_about_font);
 	about_items[idx++] = (SettingItem)ITEM_BUTTON_INIT(
 		"Updater", "",
 		updater_check_for_updates);

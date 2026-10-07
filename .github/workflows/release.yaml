@@ -134,10 +134,48 @@ jobs:
           name: core-${{ matrix.toolchain }}-${{ matrix.core }}.zip
           path: workspace/${{ env.PLATFORM }}/cores/output/
 
+  build-prebuilt:
+    # Third-party binaries built from pinned source (workspace/all/prebuilts/);
+    # shared ones (ffplay, rsync, GLideN64) only with the tg5040 toolchain.
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { toolchain: tg5040, prebuilt: ffplay, inputs: "workspace/all/mediaplayer/include/ffplay/**" }
+          - { toolchain: tg5040, prebuilt: rsync, inputs: "workspace/all/prebuilts/rsync.sh" }
+          - { toolchain: tg5040, prebuilt: gliden64, inputs: "workspace/all/other/mupen64plus/GLideN64-standalone.patch" }
+          - { toolchain: tg5040, prebuilt: mupen64plus, inputs: "workspace/all/other/mupen64plus/mupen64plus-*.patch" }
+          - { toolchain: tg5050, prebuilt: mupen64plus, inputs: "workspace/all/other/mupen64plus/mupen64plus-*.patch" }
+          - { toolchain: tg5040, prebuilt: sdl2-drastic, inputs: "workspace/all/other/sdl2-drastic/**" }
+          - { toolchain: tg5050, prebuilt: sdl2-drastic, inputs: "workspace/all/other/sdl2-drastic/**" }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Restore cached prebuilt
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: workspace/all/prebuilts/output/
+          # the N64 plugins compile the in-game overlay from workspace/all/common
+          key: prebuilt-${{ matrix.toolchain }}-${{ matrix.prebuilt }}-${{ hashFiles(format('workspace/all/prebuilts/{0}.sh', matrix.prebuilt), matrix.inputs, 'workspace/all/common/**', 'workspace/all/include/**') }}
+
+      - name: Build ${{ matrix.prebuilt }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: make build-prebuilt PLATFORM=${{ matrix.toolchain }} PREBUILT=${{ matrix.prebuilt }}
+
+      - name: Upload prebuilt
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: prebuilt-${{ matrix.toolchain }}-${{ matrix.prebuilt }}
+          path: workspace/all/prebuilts/output/
+
   build:
     needs:
       - prepare
       - build-core
+      - build-prebuilt
     runs-on: ubuntu-24.04-arm
     env:
       BUILD_TAG: ${{ needs.prepare.outputs.next-tag }}
@@ -160,6 +198,13 @@ jobs:
           SS_DEV_ID: ${{ vars.SS_DEV_ID || secrets.SS_DEV_ID }}
           SS_DEV_PASSWORD: ${{ secrets.SS_DEV_PASSWORD }}
         run: sh scripts/gen-ss-credentials.sh
+
+      - name: Download prebuilts
+        uses: actions/download-artifact@v7.0.0
+        with:
+          path: workspace/all/prebuilts/output/
+          pattern: prebuilt-*
+          merge-multiple: true
 
       - name: Download Cores (tg5040)
         uses: actions/download-artifact@v7.0.0

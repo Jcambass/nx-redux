@@ -161,6 +161,20 @@ ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
 	# libchdr for RetroAchievements CHD hashing
 	cp ./workspace/all/minarch/build/$(PLATFORM)/libchdr.so.* ./build/SYSTEM/$(PLATFORM)/lib/
 
+	# licenses: ours, the prebuilts' (committed in licenses/), plus the
+	# libraries cloned at build time and shipped
+	mkdir -p ./build/SYSTEM/$(PLATFORM)/licenses
+	cp ./LICENSE ./build/SYSTEM/$(PLATFORM)/licenses/NX-Redux.txt
+	cp ./licenses/*.txt ./build/SYSTEM/$(PLATFORM)/licenses/
+	# standalone emulators keep theirs beside them, like the cores
+	cp ./licenses/mupen64plus.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/N64.pak/LICENSE-mupen64plus.txt
+	cp ./licenses/gliden64.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/N64.pak/LICENSE-gliden64.txt
+	cp ./licenses/drastic.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/NDS.pak/LICENSE-drastic.txt
+	cp ./licenses/sdl2-drastic.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/NDS.pak/LICENSE-sdl2-drastic.txt
+	cp ./workspace/all/minarch/libchdr/LICENSE.txt ./build/SYSTEM/$(PLATFORM)/licenses/libchdr.txt
+	cp ./workspace/all/minarch/rcheevos/src/LICENSE ./build/SYSTEM/$(PLATFORM)/licenses/rcheevos.txt
+	cp ./workspace/$(PLATFORM)/other/unzip60/LICENSE ./build/SYSTEM/$(PLATFORM)/licenses/unzip60.txt
+
 	# RetroAchievements tools pak
 	cp ./workspace/all/ratools/build/$(PLATFORM)/ratools.elf ./build/SYSTEM/$(PLATFORM)/paks/Tools/RetroAchievements.pak/
 
@@ -172,6 +186,8 @@ ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
 	# gated here, not with the other SYSTEM bin copies, because it is only built
 	# for tg5040/tg5050 (see workspace/Makefile).
 	cp ./workspace/all/netplay-wizard/build/$(PLATFORM)/netplay.elf ./build/SYSTEM/$(PLATFORM)/bin/
+	# N64 netplay relay server (N64.pak)
+	cp ./workspace/all/n64-netplay-server/build/$(PLATFORM)/m64p-server.elf ./build/SYSTEM/$(PLATFORM)/paks/Emus/N64.pak/
 
 	# Pre-launch emulator options editor (run bare off PATH by options.sh and
 	# the Emulator Settings tool)
@@ -196,46 +212,115 @@ endif
 cores: # TODO: can't assume every platform will have the same stock cores (platform should be responsible for copy too)
 	# stock cores
 	cp ./workspace/$(PLATFORM)/cores/output/fceumm_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/fceumm.txt ./build/SYSTEM/$(PLATFORM)/cores/LICENSE-fceumm.txt
 	cp ./workspace/$(PLATFORM)/cores/output/gambatte_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/gambatte.txt ./build/SYSTEM/$(PLATFORM)/cores/LICENSE-gambatte.txt
 	cp ./workspace/$(PLATFORM)/cores/output/gpsp_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/gpsp.txt ./build/SYSTEM/$(PLATFORM)/cores/LICENSE-gpsp.txt
 	cp ./workspace/$(PLATFORM)/cores/output/picodrive_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/picodrive.txt ./build/SYSTEM/$(PLATFORM)/cores/LICENSE-picodrive.txt
 	cp ./workspace/$(PLATFORM)/cores/output/snes9x_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/snes9x.txt ./build/SYSTEM/$(PLATFORM)/cores/LICENSE-snes9x.txt
 	cp ./workspace/$(PLATFORM)/cores/output/pcsx_rearmed_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/pcsx_rearmed.txt ./build/SYSTEM/$(PLATFORM)/cores/LICENSE-pcsx_rearmed.txt
 	
 	# extras
 	cp ./workspace/$(PLATFORM)/cores/output/a5200_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/A5200.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/a5200.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/A5200.pak/LICENSE-a5200.txt
 	cp ./workspace/$(PLATFORM)/cores/output/prosystem_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/A7800.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/a7800.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/A7800.pak/LICENSE-a7800.txt
 	cp ./workspace/$(PLATFORM)/cores/output/stella2014_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/A2600.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/a2600.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/A2600.pak/LICENSE-a2600.txt
 	cp ./workspace/$(PLATFORM)/cores/output/handy_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/LYNX.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/handy.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/LYNX.pak/LICENSE-handy.txt
 	cp ./workspace/$(PLATFORM)/cores/output/fake08_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/P8.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/fake-08.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/P8.pak/LICENSE-fake-08.txt
 	cp ./workspace/$(PLATFORM)/cores/output/mgba_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/MGBA.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/mgba.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/MGBA.pak/LICENSE-mgba.txt
 	cp ./workspace/$(PLATFORM)/cores/output/mgba_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/SGB.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/mgba.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/SGB.pak/LICENSE-mgba.txt
 	cp ./workspace/$(PLATFORM)/cores/output/genesis_plus_gx_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/GPGX.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/genesis_plus_gx.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/GPGX.pak/LICENSE-genesis_plus_gx.txt
 	cp ./workspace/$(PLATFORM)/cores/output/flycast_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/DC.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/flycast.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/DC.pak/LICENSE-flycast.txt
 	cp ./workspace/$(PLATFORM)/cores/output/ppsspp_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PSP.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/ppsspp.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PSP.pak/LICENSE-ppsspp.txt
 	# PPSSPP runtime assets (staged next to the core by all/cores/ppsspp/build-libretro.sh), read via NX_PPSSPP_ASSETS
 	rm -rf ./build/SYSTEM/$(PLATFORM)/paks/Emus/PSP.pak/PPSSPP
 	cp -R ./workspace/$(PLATFORM)/cores/output/ppsspp-assets/PPSSPP ./build/SYSTEM/$(PLATFORM)/paks/Emus/PSP.pak/PPSSPP
 	cp ./workspace/$(PLATFORM)/cores/output/mednafen_pce_fast_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PCE.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/mednafen_pce_fast.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PCE.pak/LICENSE-mednafen_pce_fast.txt
 	cp ./workspace/$(PLATFORM)/cores/output/pokemini_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PKM.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/pokemini.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PKM.pak/LICENSE-pokemini.txt
 	cp ./workspace/$(PLATFORM)/cores/output/race_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/NGP.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/race.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/NGP.pak/LICENSE-race.txt
 	cp ./workspace/$(PLATFORM)/cores/output/race_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/NGPC.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/race.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/NGPC.pak/LICENSE-race.txt
 	cp ./workspace/$(PLATFORM)/cores/output/fbneo_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/FBN.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/fbneo.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/FBN.pak/LICENSE-fbneo.txt
 	cp ./workspace/$(PLATFORM)/cores/output/mednafen_supafaust_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/SUPA.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/mednafen_supafaust.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/SUPA.pak/LICENSE-mednafen_supafaust.txt
 	cp ./workspace/$(PLATFORM)/cores/output/mednafen_vb_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/VB.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/mednafen_vb.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/VB.pak/LICENSE-mednafen_vb.txt
 	cp ./workspace/$(PLATFORM)/cores/output/mednafen_wswan_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/WSC.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/mednafen_wswan.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/WSC.pak/LICENSE-mednafen_wswan.txt
 	cp ./workspace/$(PLATFORM)/cores/output/cap32_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/CPC.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/libretro-cap32.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/CPC.pak/LICENSE-libretro-cap32.txt
 	cp ./workspace/$(PLATFORM)/cores/output/puae2021_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PUAE.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/libretro-uae.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PUAE.pak/LICENSE-libretro-uae.txt
 	cp ./workspace/$(PLATFORM)/cores/output/prboom_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PRBOOM.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/prboom.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PRBOOM.pak/LICENSE-prboom.txt
 	cp ./workspace/$(PLATFORM)/cores/output/vice_x64_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/C64.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/c64.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/C64.pak/LICENSE-c64.txt
 	cp ./workspace/$(PLATFORM)/cores/output/vice_x128_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/C128.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/c128.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/C128.pak/LICENSE-c128.txt
 	cp ./workspace/$(PLATFORM)/cores/output/vice_xplus4_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PLUS4.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/plus4.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PLUS4.pak/LICENSE-plus4.txt
 	cp ./workspace/$(PLATFORM)/cores/output/vice_xpet_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/PET.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/pet.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/PET.pak/LICENSE-pet.txt
 	cp ./workspace/$(PLATFORM)/cores/output/vice_xvic_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/VIC.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/vic.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/VIC.pak/LICENSE-vic.txt
 	cp ./workspace/$(PLATFORM)/cores/output/bluemsx_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/MSX.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/bluemsx.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/MSX.pak/LICENSE-bluemsx.txt
 	cp ./workspace/$(PLATFORM)/cores/output/gearcoleco_libretro.so ./build/SYSTEM/$(PLATFORM)/paks/Emus/COLECO.pak
+	cp ./workspace/$(PLATFORM)/cores/output/licenses/gearcoleco.txt ./build/SYSTEM/$(PLATFORM)/paks/Emus/COLECO.pak/LICENSE-gearcoleco.txt
 
-common: build system cores
+common: build system cores prebuilts
+
+# Third-party binaries built from pinned source by workspace/all/prebuilts/<name>.sh
+# inside the toolchain image (shared ones with tg5040's). CI builds each in its
+# own cached job and drops the results in workspace/all/prebuilts/output/; locally,
+# `make build-prebuilts PLATFORM=...` builds what that platform needs.
+PREBUILTS_tg5040 = ffplay rsync gliden64 mupen64plus sdl2-drastic
+PREBUILTS_tg5050 = mupen64plus sdl2-drastic
+
+build-prebuilts:
+	@for p in $(PREBUILTS_$(PLATFORM)); do \
+		make build-prebuilt PLATFORM=$(PLATFORM) PREBUILT=$$p || exit 1; \
+	done
+
+build-prebuilt:
+ifndef PREBUILT
+	$(error PREBUILT is not set)
+endif
+	docker run --rm -v $(CURDIR)/workspace:/root/workspace ghcr.io/loveretro/$(PLATFORM)-toolchain:latest \
+		/bin/bash -c '. ~/.bashrc && cd /root/workspace && PLATFORM=$(PLATFORM) bash all/prebuilts/$(PREBUILT).sh'
+
+N64_PREBUILT_FILES = libmupen64plus.so.2 mupen64plus mupen64plus-audio-sdl.so \
+	mupen64plus-input-sdl.so mupen64plus-rsp-hle.so mupen64plus-video-rice.so
+PREBUILT_FILES_tg5040 = SYSTEM/shared/bin/ffplay SYSTEM/shared/bin/rsync \
+	BASE/Emus/shared/mupen64plus/mupen64plus-video-GLideN64.so \
+	BASE/Emus/shared/mupen64plus/libpng16.so.16
+PREBUILT_FILES = $(PREBUILT_FILES_$(PLATFORM)) \
+	$(addprefix SYSTEM/$(PLATFORM)/paks/Emus/N64.pak/,$(N64_PREBUILT_FILES)) \
+	SYSTEM/$(PLATFORM)/paks/Emus/NDS.pak/libs/libSDL2-2.0.so.0
+
+prebuilts:
+	# third-party prebuilts (see build-prebuilts); a missing one fails the build
+	@for f in $(PREBUILT_FILES); do \
+		test -f ./workspace/all/prebuilts/output/$(PLATFORM)/$$f || { echo "missing prebuilt $$f: run make build-prebuilts PLATFORM=$(PLATFORM)" >&2; exit 1; }; \
+	done
+	cp -R ./workspace/all/prebuilts/output/$(PLATFORM)/. ./build/
 	
 format:
 	git ls-files '*.c' '*.h' | xargs clang-format -i
@@ -319,6 +404,10 @@ setup: name
 	rm -rf ./build
 	mkdir -p ./releases
 	cp -R ./skeleton ./build
+	# MiSans UI fonts: shipped, but fetched from Xiaomi rather than committed
+	# (see scripts/fetch-misans.py; .cache/ keeps them between builds)
+	python3 ./scripts/fetch-misans.py ./.cache/misans
+	cp ./.cache/misans/font1.ttf ./.cache/misans/font1-arabic.ttf ./build/SYSTEM/res/
 	# skeleton/SYSTEM/osd is layered OSD *source*, assembled per-device at
 	# package time by scripts/assemble-osd.sh. It is never shipped verbatim,
 	# so keep build/ a faithful picture of what ships.
@@ -336,7 +425,7 @@ setup: name
 	rm -f ./build/BASE/Emus/shared/drastic/history.md ./build/BASE/Emus/shared/drastic/launch.sh
 	rm -rf ./build/BASE/Emus/shared/drastic/images
 	# Overlay custom drastic resources (bg, fonts) on top of upstream
-	cp -Rf ./skeleton/BASE/Emus/shared/drastic/resources/ ./build/BASE/Emus/shared/drastic/resources/
+	cp -Rf ./skeleton/BASE/Emus/shared/drastic/resources/. ./build/BASE/Emus/shared/drastic/resources/
 
 	# remove authoring detritus
 	cd ./build && find . -type f -name '.keep' -delete

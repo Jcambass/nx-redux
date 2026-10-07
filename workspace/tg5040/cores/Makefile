@@ -41,10 +41,12 @@ CORES+= ppsspp
 # *_MAKEFILE=
 # *_BUILD_PATH=
 # *_SUBMODULES=
+# *_LICENSE=
 
 a2600_REPO = https://github.com/libretro/stella2014-libretro
 a2600_CORE = stella2014_libretro.so
 a2600_HASH = 3cc89f0d316d6c924a5e3f4011d17421df58e615
+a2600_LICENSE = stella/license.txt
 
 a5200_CORE = a5200_libretro.so
 a5200_HASH = 526404072821bb2021fab16f8c5dbbca300512c8
@@ -55,12 +57,15 @@ a7800_HASH = acae250da8d98b8b9707cd499e2a0bf6d8500652
 
 handy_REPO = https://github.com/libretro/libretro-handy
 handy_HASH = fca239207e9c111da3e85d2faf0b1b9d7524e498
+handy_LICENSE = lynx/license.txt
 
 fbneo_REPO = https://github.com/libretro/FBNeo
 fbneo_CORE = fbneo_libretro.so
 fbneo_BUILD_PATH = fbneo/src/burner/libretro
 fbneo_MAKE = make
 fbneo_HASH = 6a5cc250c2db8d874a06ee86e302a2a78918b4c1
+# the root LICENSE.md only links to this
+fbneo_LICENSE = src/license.txt
 
 mednafen_pce_fast_REPO = https://github.com/libretro/beetle-pce-fast-libretro
 mednafen_pce_fast_HASH = 52675734da114a19b3705f03906b1455f3d76644
@@ -128,6 +133,7 @@ race_HASH = 171950ea64c96ead503340ed60fa7ba18f56325c
 
 snes9x2005_plus_REPO = https://github.com/libretro/snes9x2005
 snes9x2005_plus_FLAGS = USE_BLARGG_APU=1
+snes9x2005_plus_LICENSE = copyright
 
 snes9x_REPO = https://github.com/libretro/snes9x
 snes9x_CORE = snes9x_libretro.so
@@ -142,6 +148,7 @@ libretro-uae_HASH = 2826e67ac623974f3b8ab15951f2f8407d81fc17
 libretro-cap32_REPO = https://github.com/libretro/libretro-cap32
 libretro-cap32_CORE = cap32_libretro.so
 libretro-cap32_HASH = 54eabbb210a6149496b1d023bebddb3f0120bc33
+libretro-cap32_LICENSE = cap32/COPYING.txt
 
 c64_REPO  = https://github.com/libretro/vice-libretro
 c64_CORE  = vice_x64_libretro.so

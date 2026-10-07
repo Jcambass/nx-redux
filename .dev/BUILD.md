@@ -49,6 +49,24 @@ make deploy PLATFORM=tg5040   # resolves to that platform's first device
 per-device: pushing the wrong device's zip leaves that unit without an OSD
 overlay, since each zip carries only its own.
 
+## Third-party prebuilts
+
+ffplay, rsync, mupen64plus (N64.pak), GLideN64 + libpng and SDL_drastic (NDS.pak) are not
+committed: `workspace/all/prebuilts/<name>.sh` builds each from pinned, sha256-checked source
+inside the toolchain image, into `workspace/all/prebuilts/output/<plat>/` (git-ignored, laid out
+like `build/`). `make common` copies them into the release and fails if one is missing. CI builds
+each in its own cached `build-prebuilt` job. Locally, once per checkout (and after changing a
+script, its patches, or `workspace/all/common` for the N64 plugins' overlay):
+
+```sh
+make build-prebuilts PLATFORM=tg5040   # ffplay rsync gliden64 mupen64plus sdl2-drastic
+make build-prebuilts PLATFORM=tg5050   # mupen64plus sdl2-drastic
+make build-prebuilt PLATFORM=tg5040 PREBUILT=ffplay   # just one
+```
+
+The MiSans UI fonts aren't committed either: `make setup` fetches them from Xiaomi
+(`scripts/fetch-misans.py`, cached in `.cache/misans/`).
+
 ## Quick build (single component via Docker)
 
 For fast iteration, build one component and push just that binary:
